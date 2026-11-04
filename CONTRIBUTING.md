@@ -39,7 +39,7 @@ The `pre-commit` hook runs ruff (lint and format) and basic file checks; the `pr
 ## Code rules
 
 - Python 3.14, dependencies managed with `uv`.
-- The HTTP layer (`app/api`) only validates input and calls services.
-- Vendors (LLM, vector store, history, tracing) are only imported in `app/adapters`.
+- The HTTP layer (`src/helpdesk_rag_chatbot/api`) only validates input and calls services.
+- Vendors (LLM, vector store, history, tracing) are only imported in `src/helpdesk_rag_chatbot/adapters`.
 - Secrets live in `.env` (never committed); document every setting in `.env.example`.
 - Tests must run without network access or API keys.
