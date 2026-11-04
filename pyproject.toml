@@ -23,6 +23,7 @@ build-backend = "uv_build"
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
+    "pre-commit>=4.7.0",
     "pytest>=9.2.0",
     "ruff>=0.17.3",
 ]
@@ -46,3 +47,7 @@ line-ending = "lf"
 # Tests
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = [
+    # Third-party noise: langsmith still uses asyncio.iscoroutinefunction.
+    'ignore:.*asyncio.iscoroutinefunction.*is deprecated:DeprecationWarning:langsmith',
+]
