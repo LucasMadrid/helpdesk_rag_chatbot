@@ -1,5 +1,6 @@
 """Tests for helpdesk_rag_chatbot.config."""
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -20,7 +21,7 @@ OPTIONAL_ENV = ["LLM_TIMEOUT"]
 
 
 @pytest.fixture(autouse=True)
-def isolated_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def isolated_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[None]:
     """Run each test with no ambient settings and no real .env file.
 
     Clears every setting from the process environment, moves the cwd to an empty
