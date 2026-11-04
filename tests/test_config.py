@@ -56,8 +56,8 @@ def test_loads_values_from_environment(full_env: dict[str, str]) -> None:
     assert settings.app_db_url.get_secret_value() == full_env["APP_DB_URL"]
 
 
-def test_llm_timeout_defaults_to_60(full_env: dict[str, str]) -> None:
-    assert Settings().llm_timeout == 60.0
+def test_llm_timeout_defaults_to_15(full_env: dict[str, str]) -> None:
+    assert Settings().llm_timeout == 15.0
 
 
 def test_llm_timeout_can_be_overridden(
