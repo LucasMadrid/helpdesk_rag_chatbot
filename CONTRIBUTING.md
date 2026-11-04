@@ -10,6 +10,18 @@ main  <-  dev  <-  feature/*
 - **`dev`**: integration branch and the default target for pull requests.
 - **`feature/<short-name>`**: one branch per piece of work, created from `dev`, for example `feature/week-1-foundations`.
 
+## First-time setup
+
+After cloning, run once:
+
+```
+uv sync
+uv run pre-commit install --hook-type pre-commit --hook-type pre-push
+```
+
+Git hooks are not cloned with the repository, so without this step no checks run locally.
+The `pre-commit` hook runs ruff (lint and format) and basic file checks; the `pre-push` hook runs `pytest`.
+
 ## Workflow
 
 1. `git checkout dev && git pull`
@@ -26,7 +38,7 @@ main  <-  dev  <-  feature/*
 
 ## Code rules
 
-- Python 3.12, dependencies managed with `uv`.
+- Python 3.14, dependencies managed with `uv`.
 - The HTTP layer (`app/api`) only validates input and calls services.
 - Vendors (LLM, vector store, history, tracing) are only imported in `app/adapters`.
 - Secrets live in `.env` (never committed); document every setting in `.env.example`.

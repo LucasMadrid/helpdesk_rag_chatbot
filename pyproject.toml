@@ -1,0 +1,50 @@
+[project]
+name = "helpdesk-rag-chatbot"
+version = "0.1.0"
+description = "A Retrieval-Augmented Generation chatbot for helpdesk support workflows"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.162.0",
+    "langchain>=1.4.8",
+    "langchain-openai>=1.7.3",
+    "langfuse>=5.1.0",
+    "pydantic-settings>=2.16.2",
+    "uvicorn>=0.54.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pre-commit>=4.7.0",
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+]
+
+[tool.ruff]
+# Same as Black.
+line-length = 88
+indent-width = 4
+
+# Assume Python 3.14
+target-version = "py314"
+
+[tool.ruff.lint]
+extend-select = ["I"]
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+
+[tool.ruff.format]
+line-ending = "lf"
+
+# Tests
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = [
+    # Third-party noise (Transitive dependency): langsmith still uses asyncio.iscoroutinefunction. Upgrade langsmith should solve it
+    'ignore:.*asyncio.iscoroutinefunction.*is deprecated:DeprecationWarning:langsmith',
+]
