@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for a Python project
+        id: project
+        run: |
+          if [ -f pyproject.toml ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "No pyproject.toml yet, skipping lint and tests."
+          fi
+
+      - name: Install uv
+        if: steps.project.outputs.exists == 'true'
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        if: steps.project.outputs.exists == 'true'
+        run: uv sync --all-extras --dev
+
+      - name: Lint (ruff)
+        if: steps.project.outputs.exists == 'true'
+        run: uv run --with ruff ruff check .
+
+      - name: Run tests
+        if: steps.project.outputs.exists == 'true'
+        run: uv run pytest
