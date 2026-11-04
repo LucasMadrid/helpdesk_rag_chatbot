@@ -20,4 +20,17 @@ The Langfuse UI opens at http://localhost:3000.
 To stop the stack, run `docker compose down`. Don't add `-v` unless you want to
 delete **all** data, including `app-db` (see [ADR 0001](docs/adr/0001-separate-app-database.md)).
 
+### Check the LLM gateway
+
+`uv run pytest` never calls a real LLM. To check that your `.env` reaches the
+LiteLLM gateway, send one test message:
+
+```bash
+uv run python scripts/ping_llm.py
+```
+
+It prints the gateway, model, latency, reply and token usage, then `OK`. It
+prints `FAILED: ...` and exits with code 1 if the call fails. The app talks to
+the gateway through `ChatOpenAI` (see [ADR 0002](docs/adr/0002-llm-client.md)).
+
 For the branch flow and pre-commit setup, see [CONTRIBUTING.md](CONTRIBUTING.md).
