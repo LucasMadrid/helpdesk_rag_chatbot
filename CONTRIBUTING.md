@@ -26,7 +26,7 @@ main  <-  dev  <-  feature/*
 
 ## Code rules
 
-- Python 3.12, dependencies managed with `uv`.
+- Python 3.14, dependencies managed with `uv`.
 - The HTTP layer (`app/api`) only validates input and calls services.
 - Vendors (LLM, vector store, history, tracing) are only imported in `app/adapters`.
 - Secrets live in `.env` (never committed); document every setting in `.env.example`.
