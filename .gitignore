@@ -221,3 +221,7 @@ __marimo__/
 
 # VS Code
 .vscode/
+
+
+# Manual scripts
+.scripts/
