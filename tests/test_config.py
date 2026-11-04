@@ -68,8 +68,7 @@ def test_llm_timeout_can_be_overridden(
     assert Settings().llm_timeout == 12.5
 
 
-# It creates a new test based on the requred environment variables and checks if the settings are loaded correctly from the environment.
-# It also tests the default value of `llm_timeout` and its ability to be overridden.
+# Test that each required environment variable is validated and named when missing.
 @pytest.mark.parametrize("missing", sorted(REQUIRED_ENV))
 def test_missing_required_variable_fails_and_names_it(
     missing: str, full_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
