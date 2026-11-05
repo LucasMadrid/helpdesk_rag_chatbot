@@ -59,6 +59,8 @@ def test_chat_returns_answer_and_request_id(make_client: ClientFactory) -> None:
 @pytest.mark.parametrize(
     ("body", "field"),
     [
+        pytest.param(_payload(user_id=None), "user_id", id="null-user-id"),
+        pytest.param(_payload(session_id=None), "session_id", id="null-session-id"),
         pytest.param(_payload(message=""), "message", id="empty-message"),
         pytest.param(_payload(message="   "), "message", id="blank-message"),
         pytest.param(_payload(message="x" * 1001), "message", id="message-too-long"),

@@ -9,11 +9,11 @@ from helpdesk_rag_chatbot.api.dependencies import ChatServiceDependency
 class ChatRequest(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
-    user_id: UUID7 | None = Field(
-        description="The unique identifier of the user making the request. If not provided, a new UUID will be generated for the session."
+    user_id: UUID7 = Field(
+        description="The unique identifier (UUIDv7) of the user making the request."
     )
-    session_id: UUID7 | None = Field(
-        description="The unique identifier of the chat session. If not provided, a new UUID will be generated for the session."
+    session_id: UUID7 = Field(
+        description="The unique identifier (UUIDv7) of the chat session."
     )
     message: str = Field(
         description="The input message to send to the chatbot.",
