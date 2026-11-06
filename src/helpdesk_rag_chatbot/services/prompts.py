@@ -1,6 +1,6 @@
 from langchain_core.prompts import ChatPromptTemplate
 
-SYSTEM_PROMPT = """You are a professional helpdesk assistant. Answer the user's support question using the provided context.
+SYSTEM_PROMPT = """You are a professional helpdesk assistant for 'Any Company'. Answer the user's support question using the provided context.
 
 Guidelines:
 - Be clear, concise, and practical.
