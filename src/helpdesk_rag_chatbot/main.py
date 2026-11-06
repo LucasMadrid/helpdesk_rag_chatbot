@@ -26,7 +26,16 @@ def make_lifespan(settings: Settings | None = None):
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        """Create the shared clients at startup and release them at shutdown."""
+        """
+        Manage the application's startup and shutdown.
+
+        On startup, build a single ``ChatService`` (chat model plus tracing
+        callbacks) and store it in ``app.state.chat_service``, so every request
+        reuses it instead of creating its own (see ADR 0003). On shutdown, flush
+        the buffered Langfuse traces so the last requests are not lost.
+
+        :param app: The FastAPI application whose state holds the shared clients.
+        """
         resolved = settings or get_settings()
         app.state.chat_service = ChatService(
             get_chat_model(resolved), callbacks=get_callback_handlers(resolved)
