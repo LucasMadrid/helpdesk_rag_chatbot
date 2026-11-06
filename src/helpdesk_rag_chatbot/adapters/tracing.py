@@ -25,7 +25,12 @@ def get_langfuse_handler(settings: Settings) -> CallbackHandler | None:
     Langfuse(
         public_key=public_key,
         secret_key=settings.langfuse_secret_key.get_secret_value(),
-        base_url=str(settings.langfuse_base_url),
+        # Strip the trailing slash: pydantic's HttpUrl turns "http://localhost:3000"
+        # into "http://localhost:3000/", and the Langfuse SDK appends "/api/...",
+        # so it would POST to "//api/public/otel/v1/traces". Langfuse answers that
+        # with a 308 redirect, which the exporter does not follow, so every trace
+        # is silently dropped (no error, no log line).
+        base_url=str(settings.langfuse_base_url).rstrip("/"),
     )
     return CallbackHandler(public_key=public_key)
 
