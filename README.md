@@ -33,6 +33,14 @@ Open http://127.0.0.1:8000/docs to try the endpoints:
   (1 to 1000 characters), and returns an `answer` and a `request_id`. To get a
   UUID7, run `uv run python -c "import uuid; print(uuid.uuid7())"`.
 
+### See traces in Langfuse
+
+Tracing is off by default. To send every `/chat` call to Langfuse, set
+`LANGFUSE_ENABLED=true` in `.env`, along with the Langfuse keys from the UI
+(Settings > API keys), then restart the API. Each call shows up as one trace
+named `chat`, grouped by user and session, with the `request_id` in its metadata.
+Tests and CI leave tracing off, so they never need Langfuse running.
+
 ### Check the LLM gateway
 
 `uv run pytest` never calls a real LLM. To check that your `.env` reaches the
