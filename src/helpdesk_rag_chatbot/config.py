@@ -13,7 +13,8 @@ class Settings(BaseSettings):
 
     Groups:
             LiteLLM: gateway URL, API key and model name used for LLM calls.
-            Langfuse: public/secret keys and base URL used for tracing.
+            Langfuse: public/secret keys and base URL used for tracing, plus
+            LANGFUSE_ENABLED (optional, default false) to switch tracing on.
             App DB: connection URL for the application database.
             LLM_TIMEOUT: request timeout in seconds (optional, default 15.0).
 
@@ -28,6 +29,7 @@ class Settings(BaseSettings):
     langfuse_public_key: SecretStr = Field(validation_alias="LANGFUSE_PUBLIC_KEY")
     langfuse_secret_key: SecretStr = Field(validation_alias="LANGFUSE_SECRET_KEY")
     langfuse_base_url: HttpUrl = Field(validation_alias="LANGFUSE_BASE_URL")
+    langfuse_enabled: bool = Field(default=False, validation_alias="LANGFUSE_ENABLED")
 
     app_db_url: SecretStr = Field(validation_alias="APP_DB_URL")
     llm_timeout: float = Field(default=15.0, validation_alias="LLM_TIMEOUT")
