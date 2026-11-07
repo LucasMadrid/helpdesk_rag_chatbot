@@ -1,6 +1,7 @@
 """Tests for helpdesk_rag_chatbot.adapters.tracing."""
 
-import importlib
+import os
+import subprocess
 import sys
 from unittest.mock import MagicMock
 
@@ -35,12 +36,19 @@ def make_settings(**overrides: object) -> Settings:
     return Settings(_env_file=None, **(base | overrides))  # type: ignore[call-arg]
 
 
-def test_import_needs_no_langfuse_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in ("LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_BASE_URL"):
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.delitem(sys.modules, "helpdesk_rag_chatbot.adapters.tracing")
+def test_import_needs_no_langfuse_environment() -> None:
+    # A fresh interpreter, because this module already imported tracing at the
+    # top, so an in-process import_module would only return the cached module.
+    env = {k: v for k, v in os.environ.items() if not k.startswith("LANGFUSE_")}
+    result = subprocess.run(
+        [sys.executable, "-c", "import helpdesk_rag_chatbot.adapters.tracing"],
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
 
-    importlib.import_module("helpdesk_rag_chatbot.adapters.tracing")
+    assert result.returncode == 0, result.stderr
 
 
 def test_tracing_is_off_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
