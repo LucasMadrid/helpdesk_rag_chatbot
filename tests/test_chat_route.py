@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from unittest.mock import AsyncMock
+from unittest.mock import ANY, AsyncMock
 from uuid import UUID, uuid4, uuid7
 
 import pytest
@@ -46,14 +46,23 @@ def _payload(**overrides: object) -> dict:
 
 def test_chat_returns_answer_and_request_id(make_client: ClientFactory) -> None:
     client, reply = make_client()
+    body = _payload()
 
-    response = client.post("/chat", json=_payload())
+    response = client.post("/chat", json=body)
 
     assert response.status_code == 200
     data = response.json()
     assert data["answer"] == FAKE_ANSWER
+    # The server generates the request_id: it must be a valid UUIDv7.
     assert UUID(data["request_id"]).version == 7
-    reply.assert_awaited_once_with("How do I reset my password?")
+    reply.assert_awaited_once_with(
+        "How do I reset my password?",
+        user_id=body["user_id"],
+        request_id=ANY,
+        session_id=body["session_id"],
+    )
+    # The id given to the service (and traces) is the one returned to the client.
+    assert reply.await_args.kwargs["request_id"] == data["request_id"]
 
 
 @pytest.mark.parametrize(

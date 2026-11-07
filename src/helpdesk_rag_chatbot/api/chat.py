@@ -1,4 +1,4 @@
-from uuid import uuid7
+import uuid
 
 from fastapi import APIRouter
 from pydantic import UUID7, BaseModel, ConfigDict, Field
@@ -24,7 +24,7 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     request_id: UUID7 = Field(
-        description="The unique identifier of the chat request. This is returned to the client for tracking purposes."
+        description="The server-generated unique identifier (UUIDv7) of this request. It is also attached to traces, so the client can quote it when reporting a problem."
     )
     answer: str = Field(description="The generated response text from the chatbot.")
 
@@ -41,5 +41,11 @@ async def chat(body: ChatRequest, service: ChatServiceDependency) -> ChatRespons
     :param service: The chat service dependency.
     :return: A chat response containing the generated reply.
     """
-    answer = await service.reply(body.message)
-    return ChatResponse(request_id=uuid7(), answer=answer)
+    request_id = uuid.uuid7()
+    answer = await service.reply(
+        body.message,
+        request_id=str(request_id),
+        user_id=str(body.user_id),
+        session_id=str(body.session_id),
+    )
+    return ChatResponse(request_id=request_id, answer=answer)

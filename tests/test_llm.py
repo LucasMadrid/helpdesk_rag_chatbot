@@ -7,19 +7,26 @@ from helpdesk_rag_chatbot.adapters.llm import get_chat_model
 from helpdesk_rag_chatbot.config import Settings
 
 
-def make_settings() -> Settings:
-    """Build validated Settings from explicit values, ignoring any real .env."""
-    return Settings(
-        _env_file=None,  # type: ignore[call-arg]
-        LITELLM_URL="http://gateway.test:4000",
-        LITELLM_KEY="sk-test",
-        LITELLM_MODEL="gpt-test",
-        LANGFUSE_PUBLIC_KEY="pk-lf-test",
-        LANGFUSE_SECRET_KEY="sk-lf-test",
-        LANGFUSE_BASE_URL="http://localhost:3000",
-        APP_DB_URL="postgresql://user:pw@localhost:5432/app",
-        LLM_TIMEOUT=7.0,
-    )
+def make_settings(**overrides: object) -> Settings:
+    """Build validated Settings from explicit values, ignoring any real .env.
+
+    Deterministic: Langfuse tracing is off unless a test overrides it.
+    """
+    base: dict[str, object] = {
+        "LITELLM_URL": "http://gateway.test:4000",
+        "LITELLM_KEY": "sk-test",
+        "LITELLM_MODEL": "gpt-test",
+        "LANGFUSE_PUBLIC_KEY": "pk-lf-test",
+        "LANGFUSE_SECRET_KEY": "sk-lf-test",
+        "LANGFUSE_BASE_URL": "http://localhost:3000",
+        # Explicit, so a LANGFUSE_ENABLED in the process environment cannot leak in.
+        "LANGFUSE_ENABLED": False,
+        "APP_DB_URL": "postgresql://user:pw@localhost:5432/app",
+        "LLM_TIMEOUT": 7.0,
+    }
+    # Merge as dicts: an override replaces a base value instead of raising
+    # "multiple values for keyword argument".
+    return Settings(_env_file=None, **(base | overrides))  # type: ignore[call-arg]
 
 
 def test_returns_base_chat_model() -> None:

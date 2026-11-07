@@ -1,23 +1,21 @@
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Request
 
-from helpdesk_rag_chatbot.adapters.llm import get_chat_model
-from helpdesk_rag_chatbot.config import Settings, get_settings
 from helpdesk_rag_chatbot.services.chat import ChatService
 
 
-def get_chat_service(
-    settings: Annotated[Settings, Depends(get_settings)],
-) -> ChatService:
+def get_chat_service(request: Request) -> ChatService:
     """
-    Build a ChatService instance using the provided settings.
+    Return the ChatService that the app built once at startup.
 
-    :param settings: Application settings providing the chat model configuration.
-    :return: A ChatService instance configured with the appropriate chat model.
+    This only fetches the shared instance from ``app.state``; it builds nothing.
+    The lifespan in ``main.py`` is the only place that creates it (ADR 0003).
+
+    :param request: The incoming request, used to reach ``app.state``.
+    :return: The shared ChatService instance.
     """
-    chat_model = get_chat_model(settings)
-    return ChatService(chat_model)
+    return request.app.state.chat_service
 
 
 # Define a dependency type for ChatService to be used in FastAPI routes
