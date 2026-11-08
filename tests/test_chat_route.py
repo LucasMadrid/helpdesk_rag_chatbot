@@ -109,3 +109,29 @@ def test_chat_rejects_invalid_payload(
     assert [e["loc"] for e in errors] == [["body", field]]
     # Validation failed before the handler ran, so the service was never called.
     reply.assert_not_called()
+
+
+def test_trailing_slash_redirects_to_the_canonical_path(
+    make_client: ClientFactory,
+) -> None:
+    # FastAPI answers POST /chat/ with a 307 to /chat. 307 (not 301/302) keeps the
+    # method and body, so a client that follows redirects still succeeds.
+    client, reply = make_client()
+
+    response = client.post("/chat/", json=_payload(), follow_redirects=False)
+
+    assert response.status_code == 307
+    assert response.headers["location"].endswith("/chat")
+    reply.assert_not_called()  # the redirect never reaches the handler
+
+
+def test_trailing_slash_still_works_when_the_client_follows_redirects(
+    make_client: ClientFactory,
+) -> None:
+    client, reply = make_client()
+
+    response = client.post("/chat/", json=_payload(), follow_redirects=True)
+
+    assert response.status_code == 200
+    assert response.json()["answer"] == FAKE_ANSWER
+    reply.assert_awaited_once()

@@ -1,40 +1,22 @@
 """Tests for helpdesk_rag_chatbot.adapters.llm."""
 
+from collections.abc import Callable
+
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 
 from helpdesk_rag_chatbot.adapters.llm import get_chat_model
 from helpdesk_rag_chatbot.config import Settings
 
-
-def make_settings(**overrides: object) -> Settings:
-    """Build validated Settings from explicit values, ignoring any real .env.
-
-    Deterministic: Langfuse tracing is off unless a test overrides it.
-    """
-    base: dict[str, object] = {
-        "LITELLM_URL": "http://gateway.test:4000",
-        "LITELLM_KEY": "sk-test",
-        "LITELLM_MODEL": "gpt-test",
-        "LANGFUSE_PUBLIC_KEY": "pk-lf-test",
-        "LANGFUSE_SECRET_KEY": "sk-lf-test",
-        "LANGFUSE_BASE_URL": "http://localhost:3000",
-        # Explicit, so a LANGFUSE_ENABLED in the process environment cannot leak in.
-        "LANGFUSE_ENABLED": False,
-        "APP_DB_URL": "postgresql://user:pw@localhost:5432/app",
-        "LLM_TIMEOUT": 7.0,
-    }
-    # Merge as dicts: an override replaces a base value instead of raising
-    # "multiple values for keyword argument".
-    return Settings(_env_file=None, **(base | overrides))  # type: ignore[call-arg]
+SettingsFactory = Callable[..., Settings]
 
 
-def test_returns_base_chat_model() -> None:
+def test_returns_base_chat_model(make_settings: SettingsFactory) -> None:
     assert isinstance(get_chat_model(make_settings()), BaseChatModel)
 
 
-def test_settings_are_wired_into_client() -> None:
-    model = get_chat_model(make_settings())
+def test_settings_are_wired_into_client(make_settings: SettingsFactory) -> None:
+    model = get_chat_model(make_settings(LLM_TIMEOUT=7.0))
     assert isinstance(model, ChatOpenAI)
     assert model.openai_api_base == "http://gateway.test:4000/"
     assert model.openai_api_key.get_secret_value() == "sk-test"

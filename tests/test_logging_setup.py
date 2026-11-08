@@ -3,7 +3,6 @@
 import json
 import logging
 import sys
-from collections.abc import Iterator
 from datetime import UTC, datetime
 from uuid import uuid7
 
@@ -16,19 +15,6 @@ from helpdesk_rag_chatbot.utils.logging_setup import (
     configure_logging,
     request_id_ctx,
 )
-
-
-@pytest.fixture(autouse=True)
-def restore_logging() -> Iterator[None]:
-    """configure_logging changes global state, so put it back after each test."""
-    root = logging.getLogger()
-    handlers, level = root.handlers[:], root.level
-    quiet = {name: logging.getLogger(name).level for name in _QUIET_LOGGERS}
-    yield
-    root.handlers[:] = handlers
-    root.setLevel(level)
-    for name, old in quiet.items():
-        logging.getLogger(name).setLevel(old)
 
 
 def make_record(
