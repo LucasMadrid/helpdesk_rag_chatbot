@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter
@@ -7,6 +8,8 @@ from helpdesk_rag_chatbot.api.dependencies import (
     ChatServiceDependency,
     RequestIdDependency,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ChatRequest(BaseModel):
@@ -47,6 +50,13 @@ async def chat(
     :param service: The service that generates a reply for the chat message.
     :return: The generated answer and the request ID used to track this call.
     """
+    logger.info(
+        "chat request received",
+        extra={"user_id": str(body.user_id), "message_length": len(body.message)},
+    )
+
+    raise RuntimeError("boom")
+
     answer = await service.reply(
         body.message,
         request_id=request_id,

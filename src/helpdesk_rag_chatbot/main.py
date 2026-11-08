@@ -14,6 +14,7 @@ from helpdesk_rag_chatbot.api.health import router as health_router
 from helpdesk_rag_chatbot.api.middleware import add_request_id
 from helpdesk_rag_chatbot.config import Settings, get_settings
 from helpdesk_rag_chatbot.services.chat import ChatService
+from helpdesk_rag_chatbot.utils.logging_setup import configure_logging
 
 
 def make_lifespan(settings: Settings | None = None):
@@ -39,6 +40,9 @@ def make_lifespan(settings: Settings | None = None):
         :param app: The FastAPI application whose state holds the shared clients.
         """
         resolved = settings or get_settings()
+
+        configure_logging(level=resolved.log_level)
+
         app.state.chat_service = ChatService(
             get_chat_model(resolved), callbacks=get_callback_handlers(resolved)
         )
