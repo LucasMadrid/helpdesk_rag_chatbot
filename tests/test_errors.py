@@ -6,7 +6,12 @@ from uuid import uuid7
 
 import pytest
 from fastapi.testclient import TestClient
-from langchain_core.exceptions import ModelAuthenticationError, ModelTimeoutError
+from langchain_core.exceptions import (
+    ModelAuthenticationError,
+    ModelConnectionError,
+    ModelRateLimitError,
+    ModelTimeoutError,
+)
 from langchain_core.language_models import FakeListChatModel
 
 from helpdesk_rag_chatbot.adapters.llm import LLM_UNAVAILABLE_ERRORS
@@ -17,6 +22,9 @@ from helpdesk_rag_chatbot.services.chat import ChatService
 HEADER = "X-Request-ID"
 SECRET = "https://internal-gateway.example/v1 key=sk-12345"
 
+# The errors that must answer 503: the model is temporarily unreachable.
+EXPECTED_UNAVAILABLE = (ModelConnectionError, ModelTimeoutError, ModelRateLimitError)
+
 
 def make_client(error: Exception) -> TestClient:
     """Build the real app whose chat service always fails with ``error``."""
@@ -24,7 +32,7 @@ def make_client(error: Exception) -> TestClient:
     service.reply = AsyncMock(side_effect=error)  # type: ignore[method-assign]
     app = create_app()
     app.dependency_overrides[get_chat_service] = lambda: service
-    return TestClient(app, raise_server_exceptions=False)
+    return TestClient(app)
 
 
 def chat_body() -> dict:
@@ -35,7 +43,14 @@ def chat_body() -> dict:
     }
 
 
-@pytest.mark.parametrize("error_type", LLM_UNAVAILABLE_ERRORS)
+def test_the_unavailable_set_is_exactly_the_transient_errors() -> None:
+    # The expectation is spelled out here on purpose. Parametrizing over
+    # LLM_UNAVAILABLE_ERRORS alone would pass when an entry is deleted, because
+    # the list of cases would shrink with it.
+    assert set(LLM_UNAVAILABLE_ERRORS) == set(EXPECTED_UNAVAILABLE)
+
+
+@pytest.mark.parametrize("error_type", EXPECTED_UNAVAILABLE)
 def test_llm_unavailable_errors_return_503_with_the_request_id(
     error_type: type[Exception],
 ) -> None:
