@@ -1,7 +1,22 @@
+from langchain_core.exceptions import (
+    ModelConnectionError,
+    ModelRateLimitError,
+    ModelTimeoutError,
+)
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 
 from helpdesk_rag_chatbot.config import Settings
+
+# Errors that mean "the model could not be reached right now", not "the request
+# was wrong". They are transient, so the caller can answer 503 and the client may
+# retry. Bad credentials, invalid requests and similar errors are deliberately
+# not listed: they are our bugs, and should surface as a 500.
+LLM_UNAVAILABLE_ERRORS: tuple[type[Exception], ...] = (
+    ModelConnectionError,  # the gateway could not be reached
+    ModelTimeoutError,  # it did not answer within settings.llm_timeout
+    ModelRateLimitError,  # it is up, but is rejecting calls for now
+)
 
 
 def get_chat_model(settings: Settings) -> BaseChatModel:

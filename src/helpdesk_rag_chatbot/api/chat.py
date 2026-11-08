@@ -55,8 +55,6 @@ async def chat(
         extra={"user_id": str(body.user_id), "message_length": len(body.message)},
     )
 
-    raise RuntimeError("boom")
-
     answer = await service.reply(
         body.message,
         request_id=request_id,

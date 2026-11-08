@@ -87,10 +87,9 @@ def test_validation_error_response_has_the_header() -> None:
     reply.assert_not_called()
 
 
-def test_unhandled_exception_response_has_no_header() -> None:
-    # Documents a known limit. Starlette's ServerErrorMiddleware is outside
-    # user middleware, so an unhandled exception unwinds through add_request_id
-    # before any response exists, and the 500 is built outside it.
+def test_unhandled_exception_returns_500_with_the_request_id() -> None:
+    # The middleware catches the exception itself and builds the 500, so the
+    # client gets a JSON body and a header it can quote (no bare server 500).
     app, _ = make_app()
 
     @app.get("/boom")
@@ -102,4 +101,5 @@ def test_unhandled_exception_response_has_no_header() -> None:
     response = client.get("/boom")
 
     assert response.status_code == 500
-    assert HEADER not in response.headers
+    assert response.json()["request_id"] == response.headers[HEADER]
+    assert "boom" not in response.text

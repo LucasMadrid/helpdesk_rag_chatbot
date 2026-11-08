@@ -43,7 +43,6 @@ async def add_request_id(
         )
         # Return the 500 here instead of re-raising: re-raising would make the
         # server log the same traceback again and send a body with no request ID.
-        # Never put str(exc) in the body: it can leak internal details.
         return JSONResponse(
             status_code=500,
             content={"detail": "Internal server error", "request_id": request_id},

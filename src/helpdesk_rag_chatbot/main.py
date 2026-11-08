@@ -1,15 +1,17 @@
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from importlib.metadata import version
 
 from fastapi import FastAPI
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from helpdesk_rag_chatbot.adapters.llm import get_chat_model
+from helpdesk_rag_chatbot.adapters.llm import LLM_UNAVAILABLE_ERRORS, get_chat_model
 from helpdesk_rag_chatbot.adapters.tracing import (
     get_callback_handlers,
     shutdown_tracing,
 )
 from helpdesk_rag_chatbot.api.chat import router as chat_router
+from helpdesk_rag_chatbot.api.errors import llm_unavailable_handler
 from helpdesk_rag_chatbot.api.health import router as health_router
 from helpdesk_rag_chatbot.api.middleware import add_request_id
 from helpdesk_rag_chatbot.config import Settings, get_settings
@@ -28,7 +30,7 @@ def make_lifespan(settings: Settings | None = None):
     """
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI):
+    async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         """
         Manage the application's startup and shutdown.
 
@@ -69,6 +71,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     # Register request ID middleware
     app.add_middleware(BaseHTTPMiddleware, dispatch=add_request_id)
+    # Register error handlers: one per exception class, all answering 503
+    for exc_type in LLM_UNAVAILABLE_ERRORS:
+        app.add_exception_handler(exc_type, llm_unavailable_handler)
     # Register Routers
     app.include_router(health_router, tags=["health"])
     app.include_router(chat_router, tags=["chat"])
