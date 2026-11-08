@@ -17,8 +17,12 @@ _QUIET_LOGGERS = (
     "langfuse",
 )
 
-# Standard log attributes as a dictionary
-_STANDARD = set(logging.LogRecord("", 0, "", 0, "", (), None).__dict__)
+# Attributes every LogRecord has, plus the ones other formatters add later
+_STANDARD = set(logging.LogRecord("", 0, "", 0, "", (), None).__dict__) | {
+    "message",
+    "asctime",
+    "request_id",
+}
 
 
 class RequestIdFilter(logging.Filter):
@@ -41,15 +45,16 @@ class JsonFormatter(logging.Formatter):
             "time": self.formatTime(record),
             "level": record.levelname,
             "message": record.getMessage(),
-            "request_id": record.request_id,  # type: ignore
+            "request_id": getattr(record, "request_id", "-"),
             "exception": self.formatException(record.exc_info)
             if record.exc_info
             else None,
         }
 
-        # Add extra attributes to the log
+        # Add extra attributes, but never let them overwrite a core field
+        # (extra={"level": "FAKE"} must not change the real level).
         for key, value in record.__dict__.items():
-            if key not in _STANDARD:
+            if key not in _STANDARD and key not in payload:
                 payload[key] = value
 
         return json.dumps(payload, default=str)
