@@ -1,4 +1,4 @@
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from importlib.metadata import version
 
@@ -30,7 +30,7 @@ def make_lifespan(settings: Settings | None = None):
     """
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         """
         Manage the application's startup and shutdown.
 
