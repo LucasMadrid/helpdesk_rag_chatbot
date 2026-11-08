@@ -1,9 +1,12 @@
-import uuid
+from uuid import UUID
 
 from fastapi import APIRouter
 from pydantic import UUID7, BaseModel, ConfigDict, Field
 
-from helpdesk_rag_chatbot.api.dependencies import ChatServiceDependency
+from helpdesk_rag_chatbot.api.dependencies import (
+    ChatServiceDependency,
+    RequestIdDependency,
+)
 
 
 class ChatRequest(BaseModel):
@@ -33,19 +36,21 @@ router = APIRouter()
 
 
 @router.post("/chat")
-async def chat(body: ChatRequest, service: ChatServiceDependency) -> ChatResponse:
+async def chat(
+    body: ChatRequest, request_id: RequestIdDependency, service: ChatServiceDependency
+) -> ChatResponse:
     """
-    Handle a chat request and return a response.
+    Handle a chat request and return the generated response.
 
-    :param body: The chat request containing the input text.
-    :param service: The chat service dependency.
-    :return: A chat response containing the generated reply.
+    :param body: The validated request containing the user, session, and message.
+    :param request_id: The ID the request ID middleware assigned to this request.
+    :param service: The service that generates a reply for the chat message.
+    :return: The generated answer and the request ID used to track this call.
     """
-    request_id = uuid.uuid7()
     answer = await service.reply(
         body.message,
-        request_id=str(request_id),
+        request_id=request_id,
         user_id=str(body.user_id),
         session_id=str(body.session_id),
     )
-    return ChatResponse(request_id=request_id, answer=answer)
+    return ChatResponse(request_id=UUID(request_id), answer=answer)

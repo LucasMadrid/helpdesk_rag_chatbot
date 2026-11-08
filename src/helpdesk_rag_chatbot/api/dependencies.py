@@ -20,3 +20,20 @@ def get_chat_service(request: Request) -> ChatService:
 
 # Define a dependency type for ChatService to be used in FastAPI routes
 ChatServiceDependency = Annotated[ChatService, Depends(get_chat_service)]
+
+
+def get_request_id(request: Request) -> str:
+    """
+    Return the ID that the request ID middleware assigned to this request.
+
+    This only reads ``request.state.request_id``; it generates nothing. The
+    middleware in ``api/middleware.py`` is the only place that creates it, so
+    this fails with an ``AttributeError`` if that middleware is not registered.
+
+    :param request: The incoming request, used to reach its state.
+    :return: The request ID (a UUIDv7 string).
+    """
+    return request.state.request_id
+
+
+RequestIdDependency = Annotated[str, Depends(get_request_id)]
