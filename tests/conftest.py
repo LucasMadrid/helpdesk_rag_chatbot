@@ -4,7 +4,9 @@ import logging
 from collections.abc import Callable, Iterator
 
 import pytest
+from fakes import FakePool
 
+from helpdesk_rag_chatbot import main
 from helpdesk_rag_chatbot.config import Settings
 from helpdesk_rag_chatbot.utils.logging_setup import _QUIET_LOGGERS
 
@@ -61,3 +63,20 @@ def restore_logging() -> Iterator[None]:
     root.setLevel(level)
     for name, old in quiet.items():
         logging.getLogger(name).setLevel(old)
+
+
+@pytest.fixture
+def fake_pool(monkeypatch: pytest.MonkeyPatch) -> FakePool:
+    """Replace the app's database pool and table setup with in-memory fakes.
+
+    Request this in any test that runs the lifespan (``with TestClient(app)``),
+    otherwise startup tries to reach a real Postgres.
+    """
+    pool = FakePool()
+    monkeypatch.setattr(main, "build_db_pool", lambda settings: pool)
+
+    async def fake_create_table(conn: object) -> None:
+        pool.events.append("create_table")
+
+    monkeypatch.setattr(main, "create_chat_history_table", fake_create_table)
+    return pool

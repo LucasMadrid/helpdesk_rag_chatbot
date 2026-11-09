@@ -5,6 +5,8 @@ from importlib.metadata import version
 from fastapi import FastAPI
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from helpdesk_rag_chatbot.adapters.chat_history import create_chat_history_table
+from helpdesk_rag_chatbot.adapters.db import build_db_pool
 from helpdesk_rag_chatbot.adapters.llm import LLM_UNAVAILABLE_ERRORS, get_chat_model
 from helpdesk_rag_chatbot.adapters.tracing import (
     get_callback_handlers,
@@ -34,10 +36,15 @@ def make_lifespan(settings: Settings | None = None):
         """
         Manage the application's startup and shutdown.
 
-        On startup, build a single ``ChatService`` (chat model plus tracing
-        callbacks) and store it in ``app.state.chat_service``, so every request
-        reuses it instead of creating its own (see ADR 0003). On shutdown, flush
-        the buffered Langfuse traces so the last requests are not lost.
+        On startup, open one ``AsyncConnectionPool`` for app-db with
+        ``wait=True`` (startup fails with ``PoolTimeout`` if the database is
+        unreachable), create the chat history table, and store the pool in
+        ``app.state.app_db_pool``. Then build a single ``ChatService`` (chat
+        model plus tracing callbacks) and store it in ``app.state.chat_service``,
+        so every request reuses it instead of creating its own (see ADR 0003).
+
+        On shutdown, flush the buffered Langfuse traces so the last requests are
+        not lost, then always close the pool, even if the flush raises.
 
         :param app: The FastAPI application whose state holds the shared clients.
         """
@@ -45,14 +52,23 @@ def make_lifespan(settings: Settings | None = None):
 
         configure_logging(level=resolved.log_level)
 
-        app.state.chat_service = ChatService(
-            get_chat_model(resolved), callbacks=get_callback_handlers(resolved)
-        )
+        app_db_pool = build_db_pool(resolved)
+        await app_db_pool.open(wait=True, timeout=5)
         try:
+            async with app_db_pool.connection() as conn:
+                await create_chat_history_table(conn)
+
+            app.state.app_db_pool = app_db_pool
+            app.state.chat_service = ChatService(
+                get_chat_model(resolved), callbacks=get_callback_handlers(resolved)
+            )
             yield
         finally:
-            # Shutdown: flush buffered traces so the last requests are not lost.
-            shutdown_tracing(resolved)
+            try:
+                # Shutdown: flush buffered traces so the last requests are not lost.
+                shutdown_tracing(resolved)
+            finally:
+                await app_db_pool.close()
 
     return lifespan
 
