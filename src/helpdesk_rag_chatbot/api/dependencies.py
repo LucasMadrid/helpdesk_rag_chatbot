@@ -40,6 +40,7 @@ def get_request_id(request: Request) -> str:
 
 RequestIdDependency = Annotated[str, Depends(get_request_id)]
 
+
 async def get_db_connection(request: Request) -> AsyncIterator[AsyncConnection]:
     """
     Yield a pooled database connection for the duration of this request.
@@ -53,5 +54,6 @@ async def get_db_connection(request: Request) -> AsyncIterator[AsyncConnection]:
     """
     async with request.app.state.app_db_pool.connection() as conn:
         yield conn
+
 
 DbConnectionDependency = Annotated[AsyncConnection, Depends(get_db_connection)]

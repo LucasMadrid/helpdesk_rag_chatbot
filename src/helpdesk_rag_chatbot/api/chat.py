@@ -46,7 +46,9 @@ class ChatResponse(BaseModel):
 router = APIRouter()
 
 
-def get_session_history(body: ChatRequest, conn: DbConnectionDependency) -> BaseChatMessageHistory:
+def get_session_history(
+    body: ChatRequest, conn: DbConnectionDependency
+) -> BaseChatMessageHistory:
     """
     Return the stored message history for the session named in the request.
 
@@ -57,16 +59,20 @@ def get_session_history(body: ChatRequest, conn: DbConnectionDependency) -> Base
     :param conn: The pooled database connection for this request.
     :return: A chat message history backed by the database for this session.
     """
-    return get_chat_history(conn=conn, session_id=str(body.session_id))
+    return get_chat_history(conn=conn, session_id=body.session_id)
 
-SessionHistoryDependency = Annotated[BaseChatMessageHistory, Depends(get_session_history)]
+
+SessionHistoryDependency = Annotated[
+    BaseChatMessageHistory, Depends(get_session_history)
+]
+
 
 @router.post("/chat")
 async def chat(
     body: ChatRequest,
     request_id: RequestIdDependency,
     service: ChatServiceDependency,
-    history: SessionHistoryDependency
+    history: SessionHistoryDependency,
 ) -> ChatResponse:
     """
     Handle a chat request and return the generated response.
@@ -86,6 +92,6 @@ async def chat(
         request_id=request_id,
         user_id=str(body.user_id),
         session_id=str(body.session_id),
-        history=history
+        history=history,
     )
     return ChatResponse(request_id=UUID(request_id), answer=answer)

@@ -44,6 +44,9 @@ class ChatService:
         :param user_id: The unique identifier of the user making the request.
         :param request_id: The unique identifier of the chat request.
         :param session_id: The unique identifier of the chat session.
+        :param history: The stored messages of this session. Earlier turns are
+            loaded into the prompt, and the new question and answer are saved
+            only after the model call succeeds.
         :return: The generated reply as a string.
         """
 
