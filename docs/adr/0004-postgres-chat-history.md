@@ -3,8 +3,6 @@
 - **Status:** Accepted
 - **Date:** 2026-11-09
 
-<!-- Draft for Lucas to review and rewrite in his own words. Check every fact against your own runs before committing. Number: 0004 is the next free number in docs/adr/. The guardrails draft in /mnt/project-files/adr/ also says 0004 and must be renumbered. -->
-
 ## Context
 
 Every `/chat` call starts from zero today, so a follow-up such as "and what about Mac?" can't work. W2-01 adds storage for the messages of a conversation, keyed by `session_id`, in the app's own Postgres (`app-db`, ADR 0001). W2-02 will read this history inside the chain, W2-03 adds a sessions API with ownership, and W2-04 trims long histories.
