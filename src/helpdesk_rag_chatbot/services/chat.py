@@ -1,5 +1,7 @@
 from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 
 from helpdesk_rag_chatbot.services.prompts import HELPDESK_PROMPT
@@ -32,6 +34,7 @@ class ChatService:
         user_id: str,
         request_id: str,
         session_id: str,
+        history: BaseChatMessageHistory,
     ) -> str:
         """
         Generate a reply to the given message using the chat model.
@@ -43,8 +46,11 @@ class ChatService:
         :param session_id: The unique identifier of the chat session.
         :return: The generated reply as a string.
         """
-        return await self.chain.ainvoke(
-            {"context": context, "question": message},
+
+        past = await history.aget_messages()
+
+        answer = await self.chain.ainvoke(
+            {"context": context, "history": past, "question": message},
             config={
                 "callbacks": self.callbacks,
                 # Names are an API for Langfuse evaluators and dashboards: keep it
@@ -62,3 +68,9 @@ class ChatService:
                 },
             },
         )
+
+        await history.aadd_messages(
+            [HumanMessage(content=message), AIMessage(content=answer)]
+        )
+
+        return answer

@@ -1,11 +1,15 @@
 import logging
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from langchain_core.chat_history import BaseChatMessageHistory
 from pydantic import UUID7, BaseModel, ConfigDict, Field
 
+from helpdesk_rag_chatbot.adapters.chat_history import get_chat_history
 from helpdesk_rag_chatbot.api.dependencies import (
     ChatServiceDependency,
+    DbConnectionDependency,
     RequestIdDependency,
 )
 
@@ -13,6 +17,8 @@ logger = logging.getLogger(__name__)
 
 
 class ChatRequest(BaseModel):
+    """Request body for ``POST /chat``: who is asking, in which session, and what."""
+
     model_config = ConfigDict(str_strip_whitespace=True)
 
     user_id: UUID7 = Field(
@@ -29,6 +35,8 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
+    """Response body for ``POST /chat``: the generated answer and its request ID."""
+
     request_id: UUID7 = Field(
         description="The server-generated unique identifier (UUIDv7) of this request. It is also attached to traces, so the client can quote it when reporting a problem."
     )
@@ -38,9 +46,27 @@ class ChatResponse(BaseModel):
 router = APIRouter()
 
 
+def get_session_history(body: ChatRequest, conn: DbConnectionDependency) -> BaseChatMessageHistory:
+    """
+    Return the stored message history for the session named in the request.
+
+    This only wraps the request's database connection in a chat history adapter
+    keyed by ``body.session_id``; it does not read or write any messages itself.
+
+    :param body: The validated request, used for its ``session_id``.
+    :param conn: The pooled database connection for this request.
+    :return: A chat message history backed by the database for this session.
+    """
+    return get_chat_history(conn=conn, session_id=str(body.session_id))
+
+SessionHistoryDependency = Annotated[BaseChatMessageHistory, Depends(get_session_history)]
+
 @router.post("/chat")
 async def chat(
-    body: ChatRequest, request_id: RequestIdDependency, service: ChatServiceDependency
+    body: ChatRequest,
+    request_id: RequestIdDependency,
+    service: ChatServiceDependency,
+    history: SessionHistoryDependency
 ) -> ChatResponse:
     """
     Handle a chat request and return the generated response.
@@ -60,5 +86,6 @@ async def chat(
         request_id=request_id,
         user_id=str(body.user_id),
         session_id=str(body.session_id),
+        history=history
     )
     return ChatResponse(request_id=UUID(request_id), answer=answer)

@@ -1,4 +1,4 @@
-from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 SYSTEM_PROMPT = """You are a professional helpdesk assistant for 'Any Company'. Answer the user's support question using the provided context.
 
@@ -18,6 +18,7 @@ Context:
 HELPDESK_PROMPT = ChatPromptTemplate.from_messages(
     messages=[
         ("system", SYSTEM_PROMPT),
+        MessagesPlaceholder("history"),
         ("human", "{question}"),
     ]
 )
