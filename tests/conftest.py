@@ -74,10 +74,10 @@ class FakePool:
     def __init__(self) -> None:
         self.events: list[str] = []
 
-    async def open(self) -> None:
+    async def open(self, wait: bool = False, timeout: float = 30.0) -> None:
         self.events.append("open")
 
-    async def close(self) -> None:
+    async def close(self, timeout: float = 5.0) -> None:
         self.events.append("close")
 
     @asynccontextmanager
