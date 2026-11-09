@@ -17,9 +17,5 @@ def build_db_pool(settings: Settings) -> AsyncConnectionPool:
     return AsyncConnectionPool(
         conninfo=settings.app_db_url.get_secret_value(),
         open=False,
-        min_size=2,
-        max_size=40,
-        num_workers=4,
-        timeout=10,
         kwargs={"autocommit": True},
     )
