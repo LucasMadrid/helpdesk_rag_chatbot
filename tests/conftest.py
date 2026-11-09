@@ -1,10 +1,12 @@
 """Shared pytest fixtures."""
 
 import logging
-from collections.abc import Callable, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
+from contextlib import asynccontextmanager
 
 import pytest
 
+from helpdesk_rag_chatbot import main
 from helpdesk_rag_chatbot.config import Settings
 from helpdesk_rag_chatbot.utils.logging_setup import _QUIET_LOGGERS
 
@@ -61,3 +63,41 @@ def restore_logging() -> Iterator[None]:
     root.setLevel(level)
     for name, old in quiet.items():
         logging.getLogger(name).setLevel(old)
+
+
+class FakePool:
+    """Stands in for AsyncConnectionPool, so no database is needed.
+
+    ``events`` records the calls in order, so a test can assert on the sequence.
+    """
+
+    def __init__(self) -> None:
+        self.events: list[str] = []
+
+    async def open(self) -> None:
+        self.events.append("open")
+
+    async def close(self) -> None:
+        self.events.append("close")
+
+    @asynccontextmanager
+    async def connection(self) -> AsyncIterator[object]:
+        self.events.append("connection")
+        yield object()
+
+
+@pytest.fixture
+def fake_pool(monkeypatch: pytest.MonkeyPatch) -> FakePool:
+    """Replace the app's database pool and table setup with in-memory fakes.
+
+    Request this in any test that runs the lifespan (``with TestClient(app)``),
+    otherwise startup tries to reach a real Postgres.
+    """
+    pool = FakePool()
+    monkeypatch.setattr(main, "build_db_pool", lambda settings: pool)
+
+    async def fake_create_table(conn: object) -> None:
+        pool.events.append("create_table")
+
+    monkeypatch.setattr(main, "create_chat_history_table", fake_create_table)
+    return pool
