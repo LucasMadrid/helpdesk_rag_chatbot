@@ -41,6 +41,21 @@ Tracing is off by default. To send every `/chat` call to Langfuse, set
 named `chat`, grouped by user and session, with the `request_id` in its metadata.
 Tests and CI leave tracing off, so they never need Langfuse running.
 
+### Logs and request IDs
+
+The API writes one JSON object per log line to the terminal. Set the level with
+`LOG_LEVEL` in `.env`: one of `DEBUG`, `INFO`, `WARNING`, `ERROR` or `CRITICAL`,
+in uppercase (default `INFO`). Any other value stops the app at startup.
+
+Every request gets a `request_id` (UUID7). It is returned in the `X-Request-ID`
+response header and in the response body, and it is added to every log line
+written during that request and to the Langfuse trace. To follow one request,
+search the logs for its ID.
+
+If the LLM gateway can't be reached, times out or rate-limits the call, `POST /chat`
+returns `503` with `{"detail": ..., "request_id": ...}`, so the client can retry
+later. Any other unexpected error returns `500` in the same shape.
+
 ### Check the LLM gateway
 
 `uv run pytest` never calls a real LLM. To check that your `.env` reaches the

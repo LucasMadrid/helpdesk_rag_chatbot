@@ -1,4 +1,5 @@
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field, HttpUrl, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -17,6 +18,7 @@ class Settings(BaseSettings):
             LANGFUSE_ENABLED (optional, default false) to switch tracing on.
             App DB: connection URL for the application database.
             LLM_TIMEOUT: request timeout in seconds (optional, default 15.0).
+            LOG_LEVEL: logging level (optional, default INFO).
 
     Secrets are `SecretStr`, so they are masked in `repr` and logs; call
     `.get_secret_value()` to read them.
@@ -33,6 +35,10 @@ class Settings(BaseSettings):
 
     app_db_url: SecretStr = Field(validation_alias="APP_DB_URL")
     llm_timeout: float = Field(default=15.0, validation_alias="LLM_TIMEOUT")
+
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
+        default="INFO", validation_alias="LOG_LEVEL"
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env", extra="ignore", env_file_encoding="utf-8"
