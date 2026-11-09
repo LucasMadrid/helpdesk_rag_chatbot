@@ -45,21 +45,18 @@ def make_lifespan(settings: Settings | None = None):
         """
         resolved = settings or get_settings()
 
-        pool = build_db_pool(resolved)
-
-        async with pool.connection() as conn:
-            await create_chat_history_table(conn)
-
-        app.state.db_pool = pool
-
         configure_logging(level=resolved.log_level)
 
-        app.state.chat_service = ChatService(
-            get_chat_model(resolved), callbacks=get_callback_handlers(resolved)
-        )
-
+        pool = build_db_pool(resolved)
         await pool.open()
         try:
+            async with pool.connection() as conn:
+                await create_chat_history_table(conn)
+
+            app.state.db_pool = pool
+            app.state.chat_service = ChatService(
+                get_chat_model(resolved), callbacks=get_callback_handlers(resolved)
+            )
             yield
         finally:
             # Shutdown: flush buffered traces so the last requests are not lost.
