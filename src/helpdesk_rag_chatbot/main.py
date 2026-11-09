@@ -5,7 +5,8 @@ from importlib.metadata import version
 from fastapi import FastAPI
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from helpdesk_rag_chatbot.adapters.db import build_db_pool, create_chat_history_table
+from helpdesk_rag_chatbot.adapters.chat_history import create_chat_history_table
+from helpdesk_rag_chatbot.adapters.db import build_db_pool
 from helpdesk_rag_chatbot.adapters.llm import LLM_UNAVAILABLE_ERRORS, get_chat_model
 from helpdesk_rag_chatbot.adapters.tracing import (
     get_callback_handlers,
