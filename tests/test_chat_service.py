@@ -50,9 +50,10 @@ def test_reply_sends_run_name_and_ids_to_callbacks():
 
     asyncio.run(service.reply("hi", **IDS))
 
-    assert "chat" in handler.names
+    assert "chat-response" in handler.names
     assert any(
-        m.get("langfuse_user_id") == "u-1"
+        m.get("langfuse_tags") == ["chat"]
+        and m.get("langfuse_user_id") == "u-1"
         and m.get("langfuse_session_id") == "s-1"
         and m.get("request_id") == "r-1"
         for m in handler.metadata

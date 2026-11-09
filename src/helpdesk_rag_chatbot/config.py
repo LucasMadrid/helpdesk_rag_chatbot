@@ -16,6 +16,8 @@ class Settings(BaseSettings):
             LiteLLM: gateway URL, API key and model name used for LLM calls.
             Langfuse: public/secret keys and base URL used for tracing, plus
             LANGFUSE_ENABLED (optional, default false) to switch tracing on.
+            APP_ENV: environment name sent to Langfuse (optional, default
+            "development").
             App DB: connection URL for the application database.
             LLM_TIMEOUT: request timeout in seconds (optional, default 15.0).
             LOG_LEVEL: logging level (optional, default INFO).
@@ -32,6 +34,14 @@ class Settings(BaseSettings):
     langfuse_secret_key: SecretStr = Field(validation_alias="LANGFUSE_SECRET_KEY")
     langfuse_base_url: HttpUrl = Field(validation_alias="LANGFUSE_BASE_URL")
     langfuse_enabled: bool = Field(default=False, validation_alias="LANGFUSE_ENABLED")
+
+    # Sent to Langfuse as the trace environment, so dev traces stay out of
+    # production dashboards. Lowercase letters, digits, hyphens and underscores only.
+    app_env: str = Field(
+        default="development",
+        validation_alias="APP_ENV",
+        pattern=r"^[a-z0-9_-]{1,40}$",
+    )
 
     app_db_url: SecretStr = Field(validation_alias="APP_DB_URL")
     llm_timeout: float = Field(default=15.0, validation_alias="LLM_TIMEOUT")

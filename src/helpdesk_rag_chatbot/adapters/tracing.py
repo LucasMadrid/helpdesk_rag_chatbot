@@ -4,6 +4,8 @@ Importing this module has no side effects: no client is created and no network
 call is made. The handler is built on demand and only when tracing is enabled.
 """
 
+from importlib.metadata import version
+
 from langchain_core.callbacks import BaseCallbackHandler
 from langfuse import Langfuse, get_client
 from langfuse.langchain import CallbackHandler
@@ -31,6 +33,9 @@ def get_langfuse_handler(settings: Settings) -> CallbackHandler | None:
         # with a 308 redirect, which the exporter does not follow, so every trace
         # is silently dropped (no error, no log line).
         base_url=str(settings.langfuse_base_url).rstrip("/"),
+        environment=settings.app_env,
+        # The package version, so a regression can be tied to a deploy.
+        release=version("helpdesk_rag_chatbot"),
     )
     return CallbackHandler(public_key=public_key)
 
