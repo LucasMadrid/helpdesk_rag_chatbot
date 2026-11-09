@@ -1,18 +1,15 @@
 """Tests for the application lifespan in helpdesk_rag_chatbot.main."""
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING
 
 import pytest
+from fakes import FakePool
 from fastapi.testclient import TestClient
 
 from helpdesk_rag_chatbot import main
 from helpdesk_rag_chatbot.config import Settings
 from helpdesk_rag_chatbot.main import create_app
 from helpdesk_rag_chatbot.services.chat import ChatService
-
-if TYPE_CHECKING:
-    from conftest import FakePool
 
 SettingsFactory = Callable[..., Settings]
 

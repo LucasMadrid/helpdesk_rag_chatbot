@@ -12,7 +12,7 @@ def get_chat_history(conn: AsyncConnection, session_id: UUID) -> BaseChatMessage
     Build the Postgres-backed message history for one chat session.
 
     The connection is borrowed, not owned: the caller opens and closes it. The
-    table must already exist (see ``PostgresChatMessageHistory.acreate_tables``).
+    table must already exist (see ``create_chat_history_table``).
 
     :param conn: An open psycopg async connection to the app database.
     :param session_id: The session to read and write. Already a ``UUID``, so it is

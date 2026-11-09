@@ -36,10 +36,15 @@ def make_lifespan(settings: Settings | None = None):
         """
         Manage the application's startup and shutdown.
 
-        On startup, build a single ``ChatService`` (chat model plus tracing
-        callbacks) and store it in ``app.state.chat_service``, so every request
-        reuses it instead of creating its own (see ADR 0003). On shutdown, flush
-        the buffered Langfuse traces so the last requests are not lost.
+        On startup, open one ``AsyncConnectionPool`` for app-db with
+        ``wait=True`` (startup fails with ``PoolTimeout`` if the database is
+        unreachable), create the chat history table, and store the pool in
+        ``app.state.app_db_pool``. Then build a single ``ChatService`` (chat
+        model plus tracing callbacks) and store it in ``app.state.chat_service``,
+        so every request reuses it instead of creating its own (see ADR 0003).
+
+        On shutdown, flush the buffered Langfuse traces so the last requests are
+        not lost, then always close the pool, even if the flush raises.
 
         :param app: The FastAPI application whose state holds the shared clients.
         """
@@ -63,7 +68,7 @@ def make_lifespan(settings: Settings | None = None):
                 # Shutdown: flush buffered traces so the last requests are not lost.
                 shutdown_tracing(resolved)
             finally:
-                await app_db_pool.close(timeout=30)
+                await app_db_pool.close()
 
     return lifespan
 

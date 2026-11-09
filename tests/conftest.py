@@ -1,10 +1,10 @@
 """Shared pytest fixtures."""
 
 import logging
-from collections.abc import AsyncIterator, Callable, Iterator
-from contextlib import asynccontextmanager
+from collections.abc import Callable, Iterator
 
 import pytest
+from fakes import FakePool
 
 from helpdesk_rag_chatbot import main
 from helpdesk_rag_chatbot.config import Settings
@@ -63,27 +63,6 @@ def restore_logging() -> Iterator[None]:
     root.setLevel(level)
     for name, old in quiet.items():
         logging.getLogger(name).setLevel(old)
-
-
-class FakePool:
-    """Stands in for AsyncConnectionPool, so no database is needed.
-
-    ``events`` records the calls in order, so a test can assert on the sequence.
-    """
-
-    def __init__(self) -> None:
-        self.events: list[str] = []
-
-    async def open(self, wait: bool = False, timeout: float = 30.0) -> None:
-        self.events.append("open")
-
-    async def close(self, timeout: float = 5.0) -> None:
-        self.events.append("close")
-
-    @asynccontextmanager
-    async def connection(self) -> AsyncIterator[object]:
-        self.events.append("connection")
-        yield object()
 
 
 @pytest.fixture
