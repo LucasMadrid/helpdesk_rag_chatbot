@@ -1,6 +1,7 @@
 import asyncio
 
 from langchain_core.callbacks import BaseCallbackHandler
+from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.language_models import FakeListChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -14,7 +15,12 @@ def test_reply_returns_fake_model_response():
     service = ChatService(FakeListChatModel(responses=["Reset it from the portal."]))
 
     reply = asyncio.run(
-        service.reply("How do I reset my password?", context="Use the portal.", **IDS)
+        service.reply(
+            "How do I reset my password?",
+            context="Use the portal.",
+            **IDS,
+            history=InMemoryChatMessageHistory(),
+        )
     )
 
     assert reply == "Reset it from the portal."
@@ -22,7 +28,7 @@ def test_reply_returns_fake_model_response():
 
 def test_prompt_renders_system_then_human_with_question():
     messages = HELPDESK_PROMPT.format_messages(
-        context="Use the portal.", question="How do I reset my password?"
+        context="Use the portal.", history=[], question="How do I reset my password?"
     )
 
     assert len(messages) == 2
@@ -48,7 +54,7 @@ def test_reply_sends_run_name_and_ids_to_callbacks():
     handler = RecordingHandler()
     service = ChatService(FakeListChatModel(responses=["ok"]), callbacks=[handler])
 
-    asyncio.run(service.reply("hi", **IDS))
+    asyncio.run(service.reply("hi", history=InMemoryChatMessageHistory(), **IDS))
 
     assert "chat-response" in handler.names
     assert any(
@@ -63,7 +69,11 @@ def test_reply_sends_run_name_and_ids_to_callbacks():
 def test_reply_works_without_callbacks():
     service = ChatService(FakeListChatModel(responses=["ok"]))
 
-    assert asyncio.run(service.reply("hi", **IDS)) == "ok"
+    reply = asyncio.run(
+        service.reply("hi", history=InMemoryChatMessageHistory(), **IDS)
+    )
+
+    assert reply == "ok"
 
 
 class PromptRecorder(BaseCallbackHandler):
@@ -80,6 +90,13 @@ def test_reply_puts_context_into_the_prompt():
     recorder = PromptRecorder()
     service = ChatService(FakeListChatModel(responses=["ok"]), callbacks=[recorder])
 
-    asyncio.run(service.reply("How do I reset it?", context="Use the portal.", **IDS))
+    asyncio.run(
+        service.reply(
+            "How do I reset it?",
+            context="Use the portal.",
+            history=InMemoryChatMessageHistory(),
+            **IDS,
+        )
+    )
 
     assert any("Use the portal." in p for p in recorder.prompts)

@@ -31,8 +31,8 @@ def make_client() -> ClientFactory:
         service.reply = reply  # type: ignore[method-assign]
         app = create_app()
         app.dependency_overrides[get_chat_service] = lambda: service
-        app.dependency_overrides[get_session_history] = (
-            lambda: InMemoryChatMessageHistory()
+        app.dependency_overrides[get_session_history] = lambda: (
+            InMemoryChatMessageHistory()
         )
         return TestClient(app), reply
 
