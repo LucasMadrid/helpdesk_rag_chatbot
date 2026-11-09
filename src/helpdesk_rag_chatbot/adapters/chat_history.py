@@ -21,7 +21,7 @@ def get_chat_history(conn: AsyncConnection, session_id: UUID) -> BaseChatMessage
         ``session_id``.
     """
     return PostgresChatMessageHistory(
-        table_name=CHAT_HISTORY_TABLE, session_id=str(session_id), async_connection=conn
+        CHAT_HISTORY_TABLE, str(session_id), async_connection=conn
     )
 
 
