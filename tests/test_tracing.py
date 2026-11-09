@@ -48,6 +48,19 @@ def test_handler_is_built_when_enabled(make_settings: SettingsFactory) -> None:
     assert isinstance(handler, CallbackHandler)
 
 
+def test_client_is_tagged_with_environment_and_release(
+    monkeypatch: pytest.MonkeyPatch, make_settings: SettingsFactory
+) -> None:
+    client_class = MagicMock()
+    monkeypatch.setattr(tracing, "Langfuse", client_class)
+
+    get_langfuse_handler(make_settings(LANGFUSE_ENABLED=True, APP_ENV="staging"))
+
+    kwargs = client_class.call_args.kwargs
+    assert kwargs["environment"] == "staging"
+    assert kwargs["release"]
+
+
 def test_shutdown_flushes_langfuse_when_enabled(
     monkeypatch: pytest.MonkeyPatch, make_settings: SettingsFactory
 ) -> None:

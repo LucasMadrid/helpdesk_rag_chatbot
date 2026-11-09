@@ -47,13 +47,17 @@ class ChatService:
             {"context": context, "question": message},
             config={
                 "callbacks": self.callbacks,
-                "run_name": "chat",
+                # Names are an API for Langfuse evaluators and dashboards: keep it
+                # verb-first, free of dynamic values, and stable.
+                "run_name": "chat-response",
                 "metadata": {
                     # The langfuse_* names are a Langfuse convention, so a different
                     # tracing vendor would need different keys here. We accept this
                     # small leak to keep ChatService free of vendor imports.
                     "langfuse_user_id": user_id,
                     "langfuse_session_id": session_id,
+                    # Tags are immutable and can only be set when the trace is created.
+                    "langfuse_tags": ["chat"],
                     "request_id": request_id,
                 },
             },
