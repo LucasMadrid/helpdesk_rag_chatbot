@@ -55,5 +55,5 @@ async def get_db_connection(request: Request) -> AsyncIterator[AsyncConnection]:
     async with request.app.state.app_db_pool.connection() as conn:
         yield conn
 
-
-DbConnectionDependency = Annotated[AsyncConnection, Depends(get_db_connection)]
+# Scope function because the connection is not needed after the response.
+DbConnectionDependency = Annotated[AsyncConnection, Depends(get_db_connection, scope="function")]
