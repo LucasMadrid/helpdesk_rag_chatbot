@@ -1,5 +1,6 @@
 import asyncio
 
+import pytest
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.language_models import FakeListChatModel
@@ -100,3 +101,52 @@ def test_reply_puts_context_into_the_prompt():
     )
 
     assert any("Use the portal." in p for p in recorder.prompts)
+
+
+def test_reply_saves_question_and_answer_to_history():
+    history = InMemoryChatMessageHistory()
+    service = ChatService(FakeListChatModel(responses=["a1"]))
+
+    asyncio.run(service.reply("q1", history=history, **IDS))
+
+    assert [(m.type, m.content) for m in history.messages] == [
+        ("human", "q1"),
+        ("ai", "a1"),
+    ]
+
+
+class FailingModel(FakeListChatModel):
+    def _call(self, *args, **kwargs):
+        raise RuntimeError("model down")
+
+
+def test_reply_does_not_save_when_the_model_fails():
+    history = InMemoryChatMessageHistory()
+    service = ChatService(FailingModel(responses=["unused"]))
+
+    with pytest.raises(RuntimeError):
+        asyncio.run(service.reply("q1", history=history, **IDS))
+
+    assert history.messages == []
+
+
+class PromptSpy(BaseCallbackHandler):
+    """Keep each prompt (list of messages) the chat model received."""
+
+    def __init__(self) -> None:
+        self.prompts: list[list] = []
+
+    def on_chat_model_start(self, serialized, messages, **kwargs):
+        self.prompts.append(messages[0])
+
+
+def test_second_reply_sends_first_turn_to_the_model():
+    spy = PromptSpy()
+    history = InMemoryChatMessageHistory()
+    service = ChatService(FakeListChatModel(responses=["a1", "a2"]), callbacks=[spy])
+
+    asyncio.run(service.reply("q1", history=history, **IDS))
+    asyncio.run(service.reply("q2", history=history, **IDS))
+
+    # [1:] skips the system message.
+    assert [m.content for m in spy.prompts[1][1:]] == ["q1", "a1", "q2"]
