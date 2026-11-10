@@ -1,6 +1,8 @@
+from collections.abc import AsyncIterator
 from typing import Annotated
 
 from fastapi import Depends, Request
+from psycopg import AsyncConnection
 
 from helpdesk_rag_chatbot.services.chat import ChatService
 
@@ -37,3 +39,26 @@ def get_request_id(request: Request) -> str:
 
 
 RequestIdDependency = Annotated[str, Depends(get_request_id)]
+
+
+async def get_db_connection(request: Request) -> AsyncIterator[AsyncConnection]:
+    """
+    Yield a pooled database connection for the duration of this request.
+
+    This borrows a connection from the pool in ``app.state.app_db_pool`` and
+    hands it back as soon as the route function returns (or raises), not when
+    the response has been sent. That is because ``DbConnectionDependency`` uses
+    ``scope="function"``. The pool itself is created once at startup by the
+    lifespan in ``main.py``.
+
+    :param request: The incoming request, used to reach ``app.state``.
+    :return: An async iterator yielding one open ``AsyncConnection``.
+    """
+    async with request.app.state.app_db_pool.connection() as conn:
+        yield conn
+
+
+# Scope function because the connection is not needed after the response.
+DbConnectionDependency = Annotated[
+    AsyncConnection, Depends(get_db_connection, scope="function")
+]

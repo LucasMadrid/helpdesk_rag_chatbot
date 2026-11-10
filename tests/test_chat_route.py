@@ -4,8 +4,10 @@ from uuid import UUID, uuid4, uuid7
 
 import pytest
 from fastapi.testclient import TestClient
+from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.language_models import FakeListChatModel
 
+from helpdesk_rag_chatbot.api.chat import get_session_history
 from helpdesk_rag_chatbot.api.dependencies import get_chat_service
 from helpdesk_rag_chatbot.main import create_app
 from helpdesk_rag_chatbot.services.chat import ChatService
@@ -29,6 +31,9 @@ def make_client() -> ClientFactory:
         service.reply = reply  # type: ignore[method-assign]
         app = create_app()
         app.dependency_overrides[get_chat_service] = lambda: service
+        app.dependency_overrides[get_session_history] = lambda: (
+            InMemoryChatMessageHistory()
+        )
         return TestClient(app), reply
 
     return _make
@@ -60,6 +65,7 @@ def test_chat_returns_answer_and_request_id(make_client: ClientFactory) -> None:
         user_id=body["user_id"],
         request_id=ANY,
         session_id=body["session_id"],
+        history=ANY,
     )
     # The id given to the service (and traces) is the one returned to the client.
     assert reply.await_args.kwargs["request_id"] == data["request_id"]

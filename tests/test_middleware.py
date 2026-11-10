@@ -5,8 +5,10 @@ from uuid import UUID, uuid7
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.language_models import FakeListChatModel
 
+from helpdesk_rag_chatbot.api.chat import get_session_history
 from helpdesk_rag_chatbot.api.dependencies import get_chat_service, get_request_id
 from helpdesk_rag_chatbot.main import create_app
 from helpdesk_rag_chatbot.services.chat import ChatService
@@ -21,6 +23,7 @@ def make_app() -> tuple[FastAPI, AsyncMock]:
     service.reply = reply  # type: ignore[method-assign]
     app = create_app()
     app.dependency_overrides[get_chat_service] = lambda: service
+    app.dependency_overrides[get_session_history] = lambda: InMemoryChatMessageHistory()
     return app, reply
 
 
@@ -60,7 +63,7 @@ def test_header_body_and_service_share_one_id() -> None:
     request_id = response.headers[HEADER]
     assert response.json()["request_id"] == request_id
     reply.assert_awaited_once_with(
-        ANY, request_id=request_id, user_id=ANY, session_id=ANY
+        ANY, request_id=request_id, user_id=ANY, session_id=ANY, history=ANY
     )
 
 

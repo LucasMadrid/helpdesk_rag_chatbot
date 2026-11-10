@@ -6,6 +6,7 @@ from uuid import uuid7
 
 import pytest
 from fastapi.testclient import TestClient
+from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.exceptions import (
     ModelAuthenticationError,
     ModelConnectionError,
@@ -15,6 +16,7 @@ from langchain_core.exceptions import (
 from langchain_core.language_models import FakeListChatModel
 
 from helpdesk_rag_chatbot.adapters.llm import LLM_UNAVAILABLE_ERRORS
+from helpdesk_rag_chatbot.api.chat import get_session_history
 from helpdesk_rag_chatbot.api.dependencies import get_chat_service
 from helpdesk_rag_chatbot.main import create_app
 from helpdesk_rag_chatbot.services.chat import ChatService
@@ -32,6 +34,7 @@ def make_client(error: Exception) -> TestClient:
     service.reply = AsyncMock(side_effect=error)  # type: ignore[method-assign]
     app = create_app()
     app.dependency_overrides[get_chat_service] = lambda: service
+    app.dependency_overrides[get_session_history] = lambda: InMemoryChatMessageHistory()
     return TestClient(app)
 
 
