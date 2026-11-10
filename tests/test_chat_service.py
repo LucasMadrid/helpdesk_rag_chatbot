@@ -150,3 +150,4 @@ def test_second_reply_sends_first_turn_to_the_model():
 
     # [1:] skips the system message.
     assert [m.content for m in spy.prompts[1][1:]] == ["q1", "a1", "q2"]
+    assert [m.type for m in history.messages] == ["human", "ai", "human", "ai"]
