@@ -17,7 +17,7 @@ REQUIRED_ENV = {
     "LANGFUSE_BASE_URL": "http://localhost:3000",
     "APP_DB_URL": "postgresql://user:pw@localhost:5432/app",
 }
-OPTIONAL_ENV = ["LLM_TIMEOUT"]
+OPTIONAL_ENV = ["LLM_TIMEOUT", "HISTORY_MAX_TOKENS"]
 
 
 @pytest.fixture(autouse=True)
@@ -66,6 +66,19 @@ def test_llm_timeout_can_be_overridden(
     monkeypatch.setenv("LLM_TIMEOUT", "12.5")
 
     assert Settings().llm_timeout == 12.5
+
+
+def test_history_max_tokens_defaults_to_2000(full_env: dict[str, str]) -> None:
+    assert Settings().history_max_tokens == 2000
+
+
+def test_history_max_tokens_of_zero_is_rejected(
+    full_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HISTORY_MAX_TOKENS", "0")
+
+    with pytest.raises(ValidationError):
+        Settings()
 
 
 # Test that each required environment variable is validated and named when missing.

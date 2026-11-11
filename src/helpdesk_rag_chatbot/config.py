@@ -20,6 +20,8 @@ class Settings(BaseSettings):
             "development").
             App DB: connection URL for the application database.
             LLM_TIMEOUT: request timeout in seconds (optional, default 15.0).
+            HISTORY_MAX_TOKENS: token budget for earlier turns sent to the model,
+            counted approximately (optional, default 2000, must be > 0).
             LOG_LEVEL: logging level (optional, default INFO).
 
     Secrets are `SecretStr`, so they are masked in `repr` and logs; call
@@ -45,6 +47,9 @@ class Settings(BaseSettings):
 
     app_db_url: SecretStr = Field(validation_alias="APP_DB_URL")
     llm_timeout: float = Field(default=15.0, validation_alias="LLM_TIMEOUT")
+    history_max_tokens: int = Field(
+        default=2000, gt=0, validation_alias="HISTORY_MAX_TOKENS"
+    )
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
         default="INFO", validation_alias="LOG_LEVEL"

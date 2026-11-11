@@ -1,7 +1,7 @@
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, trim_messages
 from langchain_core.output_parsers import StrOutputParser
 
 from helpdesk_rag_chatbot.services.prompts import HELPDESK_PROMPT
@@ -20,8 +20,11 @@ class ChatService:
         self,
         chat_model: BaseChatModel,
         callbacks: list[BaseCallbackHandler] | None = None,
+        *,
+        history_max_tokens: int = 2000,
     ):
         self.chat_model = chat_model
+        self.history_max_tokens = history_max_tokens
         self.callbacks = callbacks or []
         # Declaring the chain here to avoid re-creating it for every reply, which would be inefficient.
         self.chain = HELPDESK_PROMPT | self.chat_model | StrOutputParser()
@@ -52,8 +55,16 @@ class ChatService:
 
         past = await history.aget_messages()
 
+        kept = trim_messages(
+            past,
+            max_tokens=self.history_max_tokens,
+            token_counter="approximate",
+            strategy="last",  # keep the newest messages
+            start_on="human",  # never start with an answer whose question was cut
+        )
+
         answer = await self.chain.ainvoke(
-            {"context": context, "history": past, "question": message},
+            {"context": context, "history": kept, "question": message},
             config={
                 "callbacks": self.callbacks,
                 # Names are an API for Langfuse evaluators and dashboards: keep it
@@ -68,6 +79,8 @@ class ChatService:
                     # Tags are immutable and can only be set when the trace is created.
                     "langfuse_tags": ["chat"],
                     "request_id": request_id,
+                    "history_messages_total": len(past),
+                    "history_messages_sent": len(kept),
                 },
             },
         )

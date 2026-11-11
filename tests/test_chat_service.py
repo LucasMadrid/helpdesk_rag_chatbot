@@ -63,6 +63,8 @@ def test_reply_sends_run_name_and_ids_to_callbacks():
         and m.get("langfuse_user_id") == "u-1"
         and m.get("langfuse_session_id") == "s-1"
         and m.get("request_id") == "r-1"
+        and m.get("history_messages_total") == 0
+        and m.get("history_messages_sent") == 0
         for m in handler.metadata
     )
 
@@ -151,3 +153,61 @@ def test_second_reply_sends_first_turn_to_the_model():
     # [1:] skips the system message.
     assert [m.content for m in spy.prompts[1][1:]] == ["q1", "a1", "q2"]
     assert [m.type for m in history.messages] == ["human", "ai", "human", "ai"]
+
+
+def test_reply_sends_only_the_newest_turns_that_fit():
+    spy = PromptSpy()
+    history = InMemoryChatMessageHistory()
+    for i in range(1, 6):
+        history.add_user_message(f"q{i}")
+        history.add_ai_message(f"a{i}")
+    # Each stored message counts as 5 or 6 tokens (approximate counter), so a
+    # budget of 25 has room for the two newest turns (22) but not a third (33).
+    service = ChatService(
+        FakeListChatModel(responses=["a6"]), history_max_tokens=25, callbacks=[spy]
+    )
+
+    asyncio.run(service.reply("q6", history=history, **IDS))
+
+    # [1:] skips the system message. The new question is always sent.
+    assert [m.content for m in spy.prompts[0][1:]] == ["q4", "a4", "q5", "a5", "q6"]
+    # Trimming only affects the prompt: nothing is removed from the stored history.
+    assert len(history.messages) == 12
+
+
+def test_reply_never_starts_the_history_with_an_answer():
+    spy = PromptSpy()
+    history = InMemoryChatMessageHistory()
+    for i in range(1, 6):
+        history.add_user_message(f"q{i}")
+        history.add_ai_message(f"a{i}")
+    # A budget of 17 fits a4, q5 and a5, but a4's question was cut, so
+    # start_on="human" drops a4 as well.
+    service = ChatService(
+        FakeListChatModel(responses=["a6"]), history_max_tokens=17, callbacks=[spy]
+    )
+
+    asyncio.run(service.reply("q6", history=history, **IDS))
+
+    # [1:] skips the system message.
+    assert [m.content for m in spy.prompts[0][1:]] == ["q5", "a5", "q6"]
+
+
+def test_reply_still_sends_the_question_when_no_turn_fits():
+    spy = PromptSpy()
+    history = InMemoryChatMessageHistory()
+    history.add_user_message("q1")
+    history.add_ai_message("a1")
+    # A budget of 1 token is smaller than any single stored message, so the
+    # whole history is dropped from the prompt.
+    service = ChatService(
+        FakeListChatModel(responses=["a2"]), history_max_tokens=1, callbacks=[spy]
+    )
+
+    reply = asyncio.run(service.reply("q2", history=history, **IDS))
+
+    # [1:] skips the system message. Only the new question is left.
+    assert [m.content for m in spy.prompts[0][1:]] == ["q2"]
+    assert reply == "a2"
+    # The dropped turn is still stored, and the new turn is saved after it.
+    assert [m.content for m in history.messages] == ["q1", "a1", "q2", "a2"]

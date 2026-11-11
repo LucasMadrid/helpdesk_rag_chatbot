@@ -71,7 +71,9 @@ def make_lifespan(settings: Settings | None = None):
 
             app.state.app_db_pool = app_db_pool
             app.state.chat_service = ChatService(
-                get_chat_model(resolved), callbacks=get_callback_handlers(resolved)
+                chat_model=get_chat_model(resolved),
+                history_max_tokens=resolved.history_max_tokens,
+                callbacks=get_callback_handlers(resolved),
             )
 
             yield
