@@ -60,3 +60,30 @@ async def session_not_found_handler(request: Request, exc: Exception) -> JSONRes
             "request_id": request_id,
         },
     )
+
+
+async def db_pool_timeout_handler(request: Request, exc: Exception) -> JSONResponse:
+    """
+    Turn a database pool timeout into a 503 response.
+
+    ``PoolTimeout`` means every pooled connection stayed busy for the whole wait,
+    so the service is overloaded, not broken: the client can retry. It is logged
+    at WARNING with its traceback. The body carries the request ID but never the
+    exception text.
+
+    :param request: The request that failed; its state holds the request ID.
+    :param exc: The ``PoolTimeout`` raised while getting a connection.
+    :return: A 503 JSON response with a generic detail and the request ID.
+    """
+    logger.warning(
+        "database pool timeout",
+        exc_info=exc,
+        extra={"error_type": type(exc).__name__},
+    )
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "The service is busy. Please try again.",
+            "request_id": request.state.request_id,
+        },
+    )

@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from importlib.metadata import version
 
 from fastapi import FastAPI
+from psycopg_pool import PoolTimeout
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from helpdesk_rag_chatbot.adapters.chat_history import create_chat_history_table
@@ -18,6 +19,7 @@ from helpdesk_rag_chatbot.adapters.tracing import (
 )
 from helpdesk_rag_chatbot.api.chat import router as chat_router
 from helpdesk_rag_chatbot.api.errors import (
+    db_pool_timeout_handler,
     llm_unavailable_handler,
     session_not_found_handler,
 )
@@ -101,6 +103,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Register error handlers: one per exception class, all answering 503
     for exc_type in LLM_UNAVAILABLE_ERRORS:
         app.add_exception_handler(exc_type, llm_unavailable_handler)
+    app.add_exception_handler(PoolTimeout, db_pool_timeout_handler)
     app.add_exception_handler(SessionNotFound, session_not_found_handler)
     # Register Routers
     app.include_router(health_router, tags=["health"])

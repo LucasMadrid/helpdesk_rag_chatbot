@@ -1,6 +1,7 @@
 """Tests for the LLM-unavailable handler (helpdesk_rag_chatbot.api.errors)."""
 
 import logging
+from collections.abc import AsyncIterator
 from unittest.mock import AsyncMock
 from uuid import uuid7
 
@@ -14,9 +15,14 @@ from langchain_core.exceptions import (
     ModelTimeoutError,
 )
 from langchain_core.language_models import FakeListChatModel
+from psycopg_pool import PoolTimeout
 
 from helpdesk_rag_chatbot.adapters.llm import LLM_UNAVAILABLE_ERRORS
-from helpdesk_rag_chatbot.api.dependencies import get_chat_service, get_session_store
+from helpdesk_rag_chatbot.api.dependencies import (
+    get_chat_service,
+    get_db_connection,
+    get_session_store,
+)
 from helpdesk_rag_chatbot.main import create_app
 from helpdesk_rag_chatbot.services.chat import ChatService
 
@@ -98,3 +104,27 @@ def test_other_llm_errors_are_not_treated_as_unavailable() -> None:
 
     assert response.status_code == 500
     assert SECRET not in response.text
+
+
+def test_pool_timeout_returns_503_with_the_request_id_and_no_details(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def no_connection() -> AsyncIterator[None]:
+        raise PoolTimeout(SECRET)
+        yield  # makes this an async generator, like the real dependency
+
+    app = create_app()
+    app.dependency_overrides[get_chat_service] = lambda: ChatService(
+        FakeListChatModel(responses=["ok"])
+    )
+    app.dependency_overrides[get_db_connection] = no_connection
+
+    with caplog.at_level(logging.DEBUG):
+        response = TestClient(app).post("/chat", json=chat_body())
+
+    assert response.status_code == 503
+    assert response.json()["request_id"] == response.headers[HEADER]
+    assert "internal-gateway" not in response.text
+    assert "sk-12345" not in response.text
+    # Overload is transient: logged as a WARNING, not reported as an ERROR.
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
