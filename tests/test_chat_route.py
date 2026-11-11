@@ -115,6 +115,25 @@ def test_chat_rejects_invalid_payload(
     reply.assert_not_called()
 
 
+def test_chat_lists_each_validation_error_once(make_client: ClientFactory) -> None:
+    # Regression: the body used to be validated twice (route + history
+    # dependency), so 3 bad fields produced 6 errors.
+    client, reply = make_client()
+
+    response = client.post(
+        "/chat", json={"user_id": "nope", "session_id": "nope", "message": ""}
+    )
+
+    assert response.status_code == 422
+    errors = response.json()["detail"]
+    assert sorted(e["loc"][-1] for e in errors) == [
+        "message",
+        "session_id",
+        "user_id",
+    ]
+    reply.assert_not_called()
+
+
 def test_trailing_slash_redirects_to_the_canonical_path(
     make_client: ClientFactory,
 ) -> None:
