@@ -10,7 +10,7 @@ router = APIRouter()
 
 
 @router.get("/sessions")
-async def sessions(
+async def list_sessions(
     user_id: Annotated[UUID7, Query()], sessions: SessionStoreDependency
 ) -> list[SessionSummary]:
     """
