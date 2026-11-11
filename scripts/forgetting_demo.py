@@ -3,7 +3,10 @@
 Sends a fixed conversation to a running API in ONE session, then asks about the
 first message. Not part of pytest (it needs the real app, database and LLM).
 
-1. Start the app with a small budget, e.g. ``HISTORY_MAX_TOKENS=60`` in ``.env``::
+1. Start the app with a small budget, e.g. ``HISTORY_MAX_TOKENS=400`` in ``.env``.
+   That keeps the newest turns and drops the first one. Much smaller (e.g. 60)
+   is below one answer, so no history is sent at all. ``--reload`` does not
+   watch ``.env``: restart the server after changing it::
 
        uv run uvicorn helpdesk_rag_chatbot.main:create_app --factory --reload
 

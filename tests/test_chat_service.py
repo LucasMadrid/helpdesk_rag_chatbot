@@ -175,6 +175,24 @@ def test_reply_sends_only_the_newest_turns_that_fit():
     assert len(history.messages) == 12
 
 
+def test_reply_never_starts_the_history_with_an_answer():
+    spy = PromptSpy()
+    history = InMemoryChatMessageHistory()
+    for i in range(1, 6):
+        history.add_user_message(f"q{i}")
+        history.add_ai_message(f"a{i}")
+    # A budget of 17 fits a4, q5 and a5, but a4's question was cut, so
+    # start_on="human" drops a4 as well.
+    service = ChatService(
+        FakeListChatModel(responses=["a6"]), history_max_tokens=17, callbacks=[spy]
+    )
+
+    asyncio.run(service.reply("q6", history=history, **IDS))
+
+    # [1:] skips the system message.
+    assert [m.content for m in spy.prompts[0][1:]] == ["q5", "a5", "q6"]
+
+
 def test_reply_still_sends_the_question_when_no_turn_fits():
     spy = PromptSpy()
     history = InMemoryChatMessageHistory()
