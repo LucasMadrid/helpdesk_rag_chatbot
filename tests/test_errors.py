@@ -128,3 +128,26 @@ def test_pool_timeout_returns_503_with_the_request_id_and_no_details(
     assert "sk-12345" not in response.text
     # Overload is transient: logged as a WARNING, not reported as an ERROR.
     assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+
+def test_session_not_found_is_logged_at_info_without_a_traceback(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    store = FakeSessionStore()
+    store.owners[session_id := uuid7()] = uuid7()
+    app = create_app()
+    app.dependency_overrides[get_session_store] = lambda: store
+    app.dependency_overrides[get_chat_service] = lambda: ChatService(
+        FakeListChatModel(responses=["ok"])
+    )
+
+    with caplog.at_level(logging.DEBUG):
+        response = TestClient(app).post(
+            "/chat", json=chat_body() | {"session_id": str(session_id)}
+        )
+
+    assert response.status_code == 404
+    records = [r for r in caplog.records if r.name == "helpdesk_rag_chatbot.api.errors"]
+    assert len(records) == 1
+    assert records[0].levelno == logging.INFO
+    assert records[0].exc_info is None

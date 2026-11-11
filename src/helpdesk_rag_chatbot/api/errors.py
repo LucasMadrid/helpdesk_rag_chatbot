@@ -39,7 +39,8 @@ async def session_not_found_handler(request: Request, exc: Exception) -> JSONRes
     Turn ``SessionNotFound`` into a 404 response.
 
     The same answer is given whether the session does not exist or belongs to
-    another user, so a client cannot probe for other users' session ids.
+    another user, so a client cannot probe for other users' session ids. This is
+    an expected client error, so it is logged at INFO without a traceback.
 
     :param request: The request that failed; its state holds the request ID.
     :param exc: The ``SessionNotFound`` raised while handling the request.
@@ -47,11 +48,8 @@ async def session_not_found_handler(request: Request, exc: Exception) -> JSONRes
     """
 
     request_id = request.state.request_id
-    logger.warning(
-        "session not found",
-        exc_info=exc,
-        extra={"error_type": type(exc).__name__},
-    )
+    # An expected client error, so INFO and no traceback.
+    logger.info("session not found", extra={"error_type": type(exc).__name__})
 
     return JSONResponse(
         status_code=404,
