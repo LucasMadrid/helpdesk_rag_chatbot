@@ -1,6 +1,6 @@
 # 0006. Our own sessions table, claimed on the first chat
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-11
 
 ## Context

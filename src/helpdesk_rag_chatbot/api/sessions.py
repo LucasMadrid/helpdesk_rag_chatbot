@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 from pydantic import UUID7
 
+from helpdesk_rag_chatbot.adapters.sessions import SessionSummary
 from helpdesk_rag_chatbot.api.dependencies import SessionStoreDependency
 
 router = APIRouter()
@@ -11,7 +12,7 @@ router = APIRouter()
 @router.get("/sessions")
 async def sessions(
     user_id: Annotated[UUID7, Query()], sessions: SessionStoreDependency
-):
+) -> list[SessionSummary]:
     """
     List a user's chat sessions, most recently updated first.
 
