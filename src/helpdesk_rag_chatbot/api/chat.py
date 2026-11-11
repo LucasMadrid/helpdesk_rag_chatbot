@@ -1,16 +1,13 @@
 import logging
-from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends
-from langchain_core.chat_history import BaseChatMessageHistory
+from fastapi import APIRouter
 from pydantic import UUID7, BaseModel, ConfigDict, Field
 
-from helpdesk_rag_chatbot.adapters.chat_history import get_chat_history
 from helpdesk_rag_chatbot.api.dependencies import (
     ChatServiceDependency,
-    DbConnectionDependency,
     RequestIdDependency,
+    SessionStoreDependency,
 )
 
 logger = logging.getLogger(__name__)
@@ -46,33 +43,12 @@ class ChatResponse(BaseModel):
 router = APIRouter()
 
 
-def get_session_history(
-    body: ChatRequest, conn: DbConnectionDependency
-) -> BaseChatMessageHistory:
-    """
-    Return the stored message history for the session named in the request.
-
-    This only wraps the request's database connection in a chat history adapter
-    keyed by ``body.session_id``; it does not read or write any messages itself.
-
-    :param body: The validated request, used for its ``session_id``.
-    :param conn: The pooled database connection for this request.
-    :return: A chat message history backed by the database for this session.
-    """
-    return get_chat_history(conn=conn, session_id=body.session_id)
-
-
-SessionHistoryDependency = Annotated[
-    BaseChatMessageHistory, Depends(get_session_history)
-]
-
-
 @router.post("/chat")
 async def chat(
     body: ChatRequest,
     request_id: RequestIdDependency,
     service: ChatServiceDependency,
-    history: SessionHistoryDependency,
+    sessions: SessionStoreDependency,
 ) -> ChatResponse:
     """
     Handle a chat request and return the generated response.
@@ -85,6 +61,10 @@ async def chat(
     logger.info(
         "chat request received",
         extra={"user_id": str(body.user_id), "message_length": len(body.message)},
+    )
+
+    history = await sessions.open_history(
+        body.session_id, body.user_id, title=body.message[:80]
     )
 
     answer = await service.reply(

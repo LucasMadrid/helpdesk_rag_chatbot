@@ -32,3 +32,31 @@ async def llm_unavailable_handler(request: Request, exc: Exception) -> JSONRespo
             "request_id": request_id,
         },
     )
+
+
+async def session_not_found_handler(request: Request, exc: Exception) -> JSONResponse:
+    """
+    Turn ``SessionNotFound`` into a 404 response.
+
+    The same answer is given whether the session does not exist or belongs to
+    another user, so a client cannot probe for other users' session ids.
+
+    :param request: The request that failed; its state holds the request ID.
+    :param exc: The ``SessionNotFound`` raised while handling the request.
+    :return: A 404 JSON response with a generic detail and the request ID.
+    """
+
+    request_id = request.state.request_id
+    logger.warning(
+        "session not found",
+        exc_info=exc,
+        extra={"error_type": type(exc).__name__},
+    )
+
+    return JSONResponse(
+        status_code=404,
+        content={
+            "detail": "Session not found.",
+            "request_id": request_id,
+        },
+    )

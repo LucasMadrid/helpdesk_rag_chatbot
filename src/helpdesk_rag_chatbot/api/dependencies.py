@@ -4,6 +4,7 @@ from typing import Annotated
 from fastapi import Depends, Request
 from psycopg import AsyncConnection
 
+from helpdesk_rag_chatbot.adapters.sessions import PostgresSessionStore
 from helpdesk_rag_chatbot.services.chat import ChatService
 
 
@@ -62,3 +63,16 @@ async def get_db_connection(request: Request) -> AsyncIterator[AsyncConnection]:
 DbConnectionDependency = Annotated[
     AsyncConnection, Depends(get_db_connection, scope="function")
 ]
+
+
+async def get_session_store(conn: DbConnectionDependency) -> PostgresSessionStore:
+    """Create a session store backed by the request's database connection.
+
+    :param conn: The pooled connection provided for this request.
+    :return: A PostgreSQL session store using ``conn``.
+    """
+
+    return PostgresSessionStore(conn)
+
+
+SessionStoreDependency = Annotated[PostgresSessionStore, Depends(get_session_store)]

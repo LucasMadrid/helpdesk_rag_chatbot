@@ -8,12 +8,19 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from helpdesk_rag_chatbot.adapters.chat_history import create_chat_history_table
 from helpdesk_rag_chatbot.adapters.db import build_db_pool
 from helpdesk_rag_chatbot.adapters.llm import LLM_UNAVAILABLE_ERRORS, get_chat_model
+from helpdesk_rag_chatbot.adapters.sessions import (
+    SessionNotFound,
+    create_session_table_and_index,
+)
 from helpdesk_rag_chatbot.adapters.tracing import (
     get_callback_handlers,
     shutdown_tracing,
 )
 from helpdesk_rag_chatbot.api.chat import router as chat_router
-from helpdesk_rag_chatbot.api.errors import llm_unavailable_handler
+from helpdesk_rag_chatbot.api.errors import (
+    llm_unavailable_handler,
+    session_not_found_handler,
+)
 from helpdesk_rag_chatbot.api.health import router as health_router
 from helpdesk_rag_chatbot.api.middleware import add_request_id
 from helpdesk_rag_chatbot.config import Settings, get_settings
@@ -57,12 +64,15 @@ def make_lifespan(settings: Settings | None = None):
         try:
             async with app_db_pool.connection() as conn:
                 await create_chat_history_table(conn)
+                await create_session_table_and_index(conn)
 
             app.state.app_db_pool = app_db_pool
             app.state.chat_service = ChatService(
                 get_chat_model(resolved), callbacks=get_callback_handlers(resolved)
             )
+
             yield
+
         finally:
             try:
                 # Shutdown: flush buffered traces so the last requests are not lost.
@@ -90,6 +100,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Register error handlers: one per exception class, all answering 503
     for exc_type in LLM_UNAVAILABLE_ERRORS:
         app.add_exception_handler(exc_type, llm_unavailable_handler)
+    app.add_exception_handler(SessionNotFound, session_not_found_handler)
     # Register Routers
     app.include_router(health_router, tags=["health"])
     app.include_router(chat_router, tags=["chat"])
