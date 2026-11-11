@@ -61,6 +61,7 @@ def make_lifespan(settings: Settings | None = None):
         resolved = settings or get_settings()
 
         configure_logging(level=resolved.log_level)
+        history_max_tokens = resolved.history_max_tokens
 
         app_db_pool = build_db_pool(resolved)
         await app_db_pool.open(wait=True, timeout=5)
@@ -70,8 +71,11 @@ def make_lifespan(settings: Settings | None = None):
                 await create_session_table_and_index(conn)
 
             app.state.app_db_pool = app_db_pool
+
             app.state.chat_service = ChatService(
-                get_chat_model(resolved), callbacks=get_callback_handlers(resolved)
+                get_chat_model(resolved),
+                history_max_tokens=history_max_tokens,
+                callbacks=get_callback_handlers(resolved),
             )
 
             yield
