@@ -39,6 +39,10 @@ jobs:
         if: steps.project.outputs.exists == 'true'
         run: uv run --with ruff ruff check .
 
+      - name: Format check (ruff)
+        if: steps.project.outputs.exists == 'true'
+        run: uv run --with ruff ruff format --check .
+
       - name: Run tests
         if: steps.project.outputs.exists == 'true'
         run: uv run pytest

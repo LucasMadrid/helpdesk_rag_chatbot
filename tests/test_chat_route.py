@@ -3,18 +3,17 @@ from unittest.mock import ANY, AsyncMock
 from uuid import UUID, uuid4, uuid7
 
 import pytest
+from fakes import FakeSessionStore
 from fastapi.testclient import TestClient
-from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.language_models import FakeListChatModel
 
-from helpdesk_rag_chatbot.api.chat import get_session_history
-from helpdesk_rag_chatbot.api.dependencies import get_chat_service
+from helpdesk_rag_chatbot.api.dependencies import get_chat_service, get_session_store
 from helpdesk_rag_chatbot.main import create_app
 from helpdesk_rag_chatbot.services.chat import ChatService
 
 FAKE_ANSWER = "Reset it from the portal."
 
-ClientFactory = Callable[[], tuple[TestClient, AsyncMock]]
+ClientFactory = Callable[..., tuple[TestClient, AsyncMock]]
 
 
 @pytest.fixture
@@ -25,15 +24,14 @@ def make_client() -> ClientFactory:
     service), so tests can assert whether the route called it.
     """
 
-    def _make() -> tuple[TestClient, AsyncMock]:
+    def _make(store: FakeSessionStore | None = None) -> tuple[TestClient, AsyncMock]:
         service = ChatService(FakeListChatModel(responses=[FAKE_ANSWER]))
         reply = AsyncMock(wraps=service.reply)
         service.reply = reply  # type: ignore[method-assign]
         app = create_app()
         app.dependency_overrides[get_chat_service] = lambda: service
-        app.dependency_overrides[get_session_history] = lambda: (
-            InMemoryChatMessageHistory()
-        )
+        session_store = store or FakeSessionStore()
+        app.dependency_overrides[get_session_store] = lambda: session_store
         return TestClient(app), reply
 
     return _make
@@ -117,6 +115,25 @@ def test_chat_rejects_invalid_payload(
     reply.assert_not_called()
 
 
+def test_chat_lists_each_validation_error_once(make_client: ClientFactory) -> None:
+    # Regression: the body used to be validated twice (route + history
+    # dependency), so 3 bad fields produced 6 errors.
+    client, reply = make_client()
+
+    response = client.post(
+        "/chat", json={"user_id": "nope", "session_id": "nope", "message": ""}
+    )
+
+    assert response.status_code == 422
+    errors = response.json()["detail"]
+    assert sorted(e["loc"][-1] for e in errors) == [
+        "message",
+        "session_id",
+        "user_id",
+    ]
+    reply.assert_not_called()
+
+
 def test_trailing_slash_redirects_to_the_canonical_path(
     make_client: ClientFactory,
 ) -> None:
@@ -141,3 +158,45 @@ def test_trailing_slash_still_works_when_the_client_follows_redirects(
     assert response.status_code == 200
     assert response.json()["answer"] == FAKE_ANSWER
     reply.assert_awaited_once()
+
+
+def test_chat_opens_the_session_for_the_caller_with_a_title(
+    make_client: ClientFactory,
+) -> None:
+    store = FakeSessionStore()
+    client, _ = make_client(store)
+    body = _payload(message="x" * 200)
+
+    client.post("/chat", json=body)
+
+    assert store.calls == [(UUID(body["session_id"]), UUID(body["user_id"]), "x" * 80)]
+
+
+def test_chat_returns_404_when_the_session_belongs_to_another_user(
+    make_client: ClientFactory,
+) -> None:
+    owner_id, other_id, session_id = uuid7(), uuid7(), uuid7()
+    store = FakeSessionStore()
+    store.owners[session_id] = owner_id
+    client, reply = make_client(store)
+
+    response = client.post(
+        "/chat", json=_payload(user_id=str(other_id), session_id=str(session_id))
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Session not found."
+    assert UUID(response.json()["request_id"]).version == 7
+    reply.assert_not_called()
+
+
+def test_chat_lets_the_owner_reuse_their_session(make_client: ClientFactory) -> None:
+    owner_id, session_id = uuid7(), uuid7()
+    client, reply = make_client()
+    body = _payload(user_id=str(owner_id), session_id=str(session_id))
+
+    first = client.post("/chat", json=body)
+    second = client.post("/chat", json=body)
+
+    assert (first.status_code, second.status_code) == (200, 200)
+    assert reply.await_count == 2
