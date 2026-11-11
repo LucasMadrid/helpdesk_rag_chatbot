@@ -56,6 +56,20 @@ session that doesn't exist, so session IDs can't be probed. See
 
 `user_id` is not authentication yet: the API trusts whatever the client sends.
 
+### Long chats and the history budget
+
+Every message of a session stays in `app-db`, but `POST /chat` doesn't send all
+of them to the model. Before each call it keeps only the newest earlier turns that
+fit in `HISTORY_MAX_TOKENS` (default `2000`) and leaves out the oldest ones. The
+system prompt and the new question are always sent and don't count against the
+budget. Tokens are estimated at about 4 characters each, so the budget is
+approximate.
+
+A smaller budget makes each call cheaper and faster, but the model forgets earlier
+turns sooner. `0` or a negative value stops the app at startup. Each Langfuse
+trace shows `history_messages_total` and `history_messages_sent` in its metadata,
+so you can see how much was left out.
+
 ### See traces in Langfuse
 
 Tracing is off by default. To send every `/chat` call to Langfuse, set
