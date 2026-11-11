@@ -23,6 +23,7 @@ from helpdesk_rag_chatbot.api.errors import (
 )
 from helpdesk_rag_chatbot.api.health import router as health_router
 from helpdesk_rag_chatbot.api.middleware import add_request_id
+from helpdesk_rag_chatbot.api.sessions import router as sessions_router
 from helpdesk_rag_chatbot.config import Settings, get_settings
 from helpdesk_rag_chatbot.services.chat import ChatService
 from helpdesk_rag_chatbot.utils.logging_setup import configure_logging
@@ -104,4 +105,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Register Routers
     app.include_router(health_router, tags=["health"])
     app.include_router(chat_router, tags=["chat"])
+    app.include_router(sessions_router, tags=["sessions"])
     return app
