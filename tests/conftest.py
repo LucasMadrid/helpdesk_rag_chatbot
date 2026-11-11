@@ -78,5 +78,11 @@ def fake_pool(monkeypatch: pytest.MonkeyPatch) -> FakePool:
     async def fake_create_table(conn: object) -> None:
         pool.events.append("create_table")
 
+    async def fake_create_sessions_table(conn: object) -> None:
+        pool.events.append("create_sessions_table")
+
     monkeypatch.setattr(main, "create_chat_history_table", fake_create_table)
+    monkeypatch.setattr(
+        main, "create_session_table_and_index", fake_create_sessions_table
+    )
     return pool

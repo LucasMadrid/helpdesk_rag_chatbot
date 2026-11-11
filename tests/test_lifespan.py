@@ -29,7 +29,13 @@ def test_lifespan_opens_pool_before_creating_table_and_closes_it(
     with TestClient(create_app(make_settings())):
         pass
 
-    assert fake_pool.events == ["open", "connection", "create_table", "close"]
+    assert fake_pool.events == [
+        "open",
+        "connection",
+        "create_table",
+        "create_sessions_table",
+        "close",
+    ]
 
 
 def test_lifespan_closes_pool_even_if_shutdown_tracing_fails(
