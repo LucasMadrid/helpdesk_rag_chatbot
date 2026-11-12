@@ -117,6 +117,14 @@ async def _list(client: httpx.AsyncClient, user_id: UUID) -> list[dict]:
     return response.json()
 
 
+async def _messages(
+    client: httpx.AsyncClient, user_id: UUID, session_id: UUID
+) -> httpx.Response:
+    return await client.get(
+        f"/sessions/{session_id}/messages", params={"user_id": str(user_id)}
+    )
+
+
 async def _delete(
     client: httpx.AsyncClient, user_id: UUID, session_id: UUID
 ) -> httpx.Response:
@@ -168,6 +176,38 @@ async def test_second_turn_sends_the_first_turn_from_postgres(
         "What laptop do I have?",
     ]
     assert await _history_rows(conn, session_id) == 4
+
+
+async def test_owner_reads_the_messages_and_another_user_gets_404(
+    client: httpx.AsyncClient, users: tuple[UUID, UUID]
+) -> None:
+    """After two /chat calls the owner reads four messages, oldest first.
+
+    The questions are different on purpose, so the order is checked and not only
+    the roles. Another user asking for the same session gets the same 404 as for
+    a missing one, carrying the request ID of that request (a UUIDv7).
+    """
+    user_a, user_b = users
+    session_id = uuid7()
+    await _chat(client, user_a, session_id, "first question")
+    await _chat(client, user_a, session_id, "second question")
+
+    owner_response = await _messages(client, user_a, session_id)
+
+    assert owner_response.status_code == 200
+    assert owner_response.json() == [
+        {"role": "user", "content": "first question"},
+        {"role": "assistant", "content": "answer"},
+        {"role": "user", "content": "second question"},
+        {"role": "assistant", "content": "answer"},
+    ]
+
+    other_response = await _messages(client, user_b, session_id)
+
+    assert other_response.status_code == 404
+    body = other_response.json()
+    assert body["detail"] == "Session not found."
+    assert UUID(body["request_id"]).version == 7
 
 
 async def test_list_shows_only_the_callers_sessions_newest_first(
