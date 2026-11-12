@@ -46,6 +46,9 @@ Open http://127.0.0.1:8000/docs to try the endpoints:
 - `GET /sessions?user_id=<uuid7>` lists that user's sessions (`session_id`,
   `title`, `created_at`, `updated_at`), most recently used first, at most 50.
   A user with no sessions gets `[]`.
+- `GET /sessions/{session_id}/messages?user_id=<uuid7>` returns that session's
+  messages, oldest first, as `[{"role": "user" | "assistant", "content": ...}]`.
+  A session that doesn't exist or belongs to another user gives `404`.
 - `DELETE /sessions/{session_id}?user_id=<uuid7>` deletes the session and all
   its messages, and returns `204`.
 
