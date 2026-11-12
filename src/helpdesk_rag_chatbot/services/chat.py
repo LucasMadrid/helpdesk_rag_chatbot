@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.language_models import BaseChatModel
@@ -5,6 +7,14 @@ from langchain_core.messages import AIMessage, HumanMessage, trim_messages
 from langchain_core.output_parsers import StrOutputParser
 
 from helpdesk_rag_chatbot.services.prompts import HELPDESK_PROMPT
+
+
+@dataclass(frozen=True)
+class ImageAttachment:
+    """An image the API layer already checked: its MIME type and raw base64."""
+
+    mime_type: str
+    data: str
 
 
 class ChatService:
@@ -29,10 +39,50 @@ class ChatService:
         # Declaring the chain here to avoid re-creating it for every reply, which would be inefficient.
         self.chain = HELPDESK_PROMPT | self.chat_model | StrOutputParser()
 
+    def _run_config(
+        self, *, user_id, session_id, request_id, past, kept, image
+    ) -> dict:
+        """
+        Build the LangChain run config for one reply: callbacks, run name and
+        the metadata that tracing (Langfuse) uses to group and filter traces.
+
+        :param user_id: The unique identifier of the user making the request.
+        :param session_id: The unique identifier of the chat session.
+        :param request_id: The unique identifier of the chat request.
+        :param past: All stored messages of the session, before trimming.
+        :param kept: The messages of ``past`` that fit the token budget and are
+            sent to the model.
+        :param image: The attached image, or None. Only its presence is
+            recorded; the image data never goes into the metadata.
+        :return: A dict to pass as ``config`` to the chain.
+        """
+        return {
+            "callbacks": self.callbacks,
+            # Names are an API for Langfuse evaluators and dashboards: keep it
+            # verb-first, free of dynamic values, and stable.
+            "run_name": "chat-response",
+            "metadata": {
+                # The langfuse_* names are a Langfuse convention, so a different
+                # tracing vendor would need different keys here. We accept this
+                # small leak to keep ChatService free of vendor imports.
+                "langfuse_user_id": user_id,
+                "langfuse_session_id": session_id,
+                # Tags are immutable and can only be set when the trace is created.
+                "langfuse_tags": ["chat"],
+                "request_id": request_id,
+                "history_messages_total": len(past),
+                "history_messages_sent": len(kept),
+                "has_image": image is not None,
+            },
+        }
+
+    def _validate_image()
+
     async def reply(
         self,
         message: str,
         context: str = "",
+        image: ImageAttachment = None,
         *,
         user_id: str,
         request_id: str,
@@ -63,38 +113,39 @@ class ChatService:
             start_on="human",  # never start with an answer whose question was cut
         )
 
-        callback_config = (
-            {
-                "callbacks": self.callbacks,
-                # Names are an API for Langfuse evaluators and dashboards: keep it
-                # verb-first, free of dynamic values, and stable.
-                "run_name": "chat-response",
-                "metadata": {
-                    # The langfuse_* names are a Langfuse convention, so a different
-                    # tracing vendor would need different keys here. We accept this
-                    # small leak to keep ChatService free of vendor imports.
-                    "langfuse_user_id": user_id,
-                    "langfuse_session_id": session_id,
-                    # Tags are immutable and can only be set when the trace is created.
-                    "langfuse_tags": ["chat"],
-                    "request_id": request_id,
-                    "history_messages_total": len(past),
-                    "history_messages_sent": len(kept),
-                },
-            },
-        )
+        if image is None:
+            question = HumanMessage(content=message)
+        else:
+            question = HumanMessage(
+                content=[
+                    {"type": "text", "text": message},
+                    {
+                        "type": "image",
+                        "base64": image.data,
+                        "mime_type": image.mime_type,
+                    },
+                ]
+            )
 
         answer = await self.chain.ainvoke(
             {
                 "context": context,
                 "history": kept,
-                "question": [HumanMessage(content=message)],
+                "question": [question],
             },
-            config=callback_config,
+            config=self._run_config(
+                user_id=user_id,
+                session_id=session_id,
+                request_id=request_id,
+                past=past,
+                kept=kept,
+                image=image,
+            ),
         )
 
+        saved = message if image is None else f"{message}\n[image: {image.mime_type}]"
         await history.aadd_messages(
-            [HumanMessage(content=message), AIMessage(content=answer)]
+            [HumanMessage(content=saved), AIMessage(content=answer)]
         )
 
         return answer

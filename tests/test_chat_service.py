@@ -7,7 +7,7 @@ from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.language_models import FakeListChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from helpdesk_rag_chatbot.services.chat import ChatService
+from helpdesk_rag_chatbot.services.chat import ChatService, ImageAttachment
 from helpdesk_rag_chatbot.services.prompts import HELPDESK_PROMPT
 
 IDS = {"user_id": "u-1", "request_id": "r-1", "session_id": "s-1"}
@@ -204,3 +204,37 @@ def test_reply_still_sends_the_question_when_no_turn_fits():
     assert reply == "a2"
     # The dropped turn is still stored, and the new turn is saved after it.
     assert [m.content for m in history.messages] == ["q1", "a1", "q2", "a2"]
+
+
+def test_reply_sends_the_image_to_the_model():
+    spy = PromptSpy()
+    service = ChatService(FakeListChatModel(responses=["ok"]), callbacks=[spy])
+    image = ImageAttachment(mime_type="image/png", data="iVBORw0KGgo=")
+
+    asyncio.run(
+        service.reply(
+            "What is this error?",
+            history=InMemoryChatMessageHistory(),
+            image=image,
+            **IDS,
+        )
+    )
+
+    block = spy.prompts[0][-1].content_blocks[1]
+    assert (block["type"], block["base64"]) == ("image", "iVBORw0KGgo=")
+
+
+def test_reply_saves_a_marker_instead_of_the_image():
+    history = InMemoryChatMessageHistory()
+    service = ChatService(FakeListChatModel(responses=["ok"]))
+    image = ImageAttachment(mime_type="image/png", data="iVBORw0KGgo=")
+
+    asyncio.run(
+        service.reply("What is this error?", history=history, image=image, **IDS)
+    )
+
+    # The stored question is plain text with a marker: no base64 in the database.
+    assert [m.content for m in history.messages] == [
+        "What is this error?\n[image: image/png]",
+        "ok",
+    ]
