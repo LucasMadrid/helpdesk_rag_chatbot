@@ -1,3 +1,4 @@
+import base64
 from collections.abc import Callable
 from unittest.mock import ANY, AsyncMock
 from uuid import UUID, uuid4, uuid7
@@ -7,9 +8,10 @@ from fakes import FakeSessionStore
 from fastapi.testclient import TestClient
 from langchain_core.language_models import FakeListChatModel
 
+from helpdesk_rag_chatbot.api.chat import MAX_IMAGE_BYTES
 from helpdesk_rag_chatbot.api.dependencies import get_chat_service, get_session_store
 from helpdesk_rag_chatbot.main import create_app
-from helpdesk_rag_chatbot.services.chat import ChatService
+from helpdesk_rag_chatbot.services.chat import ChatService, ImageAttachment
 
 FAKE_ANSWER = "Reset it from the portal."
 
@@ -64,6 +66,7 @@ def test_chat_returns_answer_and_request_id(make_client: ClientFactory) -> None:
         request_id=ANY,
         session_id=body["session_id"],
         history=ANY,
+        image=None,
     )
     # The id given to the service (and traces) is the one returned to the client.
     assert reply.await_args.kwargs["request_id"] == data["request_id"]
@@ -200,3 +203,69 @@ def test_chat_lets_the_owner_reuse_their_session(make_client: ClientFactory) -> 
 
     assert (first.status_code, second.status_code) == (200, 200)
     assert reply.await_count == 2
+
+
+PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+JPEG_BYTES = b"\xff\xd8\xff\xe0" + b"\x00" * 16
+
+
+def _b64(raw: bytes) -> str:
+    return base64.b64encode(raw).decode()
+
+
+def test_chat_passes_a_valid_image_to_the_service(make_client: ClientFactory) -> None:
+    client, reply = make_client()
+    data = _b64(PNG_BYTES)
+
+    response = client.post(
+        "/chat", json=_payload(image={"media_type": "image/png", "data": data})
+    )
+
+    assert response.status_code == 200
+    assert reply.await_args.kwargs["image"] == ImageAttachment("image/png", data)
+
+
+@pytest.mark.parametrize(
+    ("image", "loc"),
+    [
+        pytest.param(
+            {"media_type": "image/png", "data": "not base64!"},
+            ["body", "image"],
+            id="invalid-base64",
+        ),
+        pytest.param(
+            {"media_type": "image/png", "data": _b64(JPEG_BYTES)},
+            ["body", "image"],
+            id="bytes-do-not-match-media-type",
+        ),
+        pytest.param(
+            {"media_type": "image/gif", "data": _b64(PNG_BYTES)},
+            ["body", "image", "media_type"],
+            id="unsupported-media-type",
+        ),
+        pytest.param(
+            {"media_type": "image/png", "data": ""},
+            ["body", "image", "data"],
+            id="empty-data",
+        ),
+        pytest.param(
+            {
+                "media_type": "image/png",
+                "data": _b64(PNG_BYTES + b"\x00" * MAX_IMAGE_BYTES),
+            },
+            # Caught by the field's length cap, before the bytes are decoded.
+            ["body", "image", "data"],
+            id="image-too-large",
+        ),
+    ],
+)
+def test_chat_rejects_an_invalid_image(
+    make_client: ClientFactory, image: dict, loc: list[str]
+) -> None:
+    client, reply = make_client()
+
+    response = client.post("/chat", json=_payload(image=image))
+
+    assert response.status_code == 422
+    assert [e["loc"] for e in response.json()["detail"]] == [loc]
+    reply.assert_not_called()

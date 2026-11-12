@@ -3,8 +3,14 @@ from dataclasses import dataclass
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import AIMessage, HumanMessage, trim_messages
+from langchain_core.messages import (
+    AIMessage,
+    BaseMessage,
+    HumanMessage,
+    trim_messages,
+)
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnableConfig
 
 from helpdesk_rag_chatbot.services.prompts import HELPDESK_PROMPT
 
@@ -51,8 +57,15 @@ class ChatService:
         self.chain = HELPDESK_PROMPT | self.chat_model | StrOutputParser()
 
     def _run_config(
-        self, *, user_id, session_id, request_id, past, kept, image
-    ) -> dict:
+        self,
+        *,
+        user_id: str,
+        session_id: str,
+        request_id: str,
+        past: list[BaseMessage],
+        kept: list[BaseMessage],
+        image: ImageAttachment | None,
+    ) -> RunnableConfig:
         """
         Build the LangChain run config for one reply: callbacks, run name and
         the metadata that tracing (Langfuse) uses to group and filter traces.
@@ -65,7 +78,7 @@ class ChatService:
             sent to the model.
         :param image: The attached image, or None. Only its presence is
             recorded; the image data never goes into the metadata.
-        :return: A dict to pass as ``config`` to the chain.
+        :return: The config to pass to the chain.
         """
         return {
             "callbacks": self.callbacks,
@@ -129,8 +142,8 @@ class ChatService:
         self,
         message: str,
         context: str = "",
-        image: ImageAttachment = None,
         *,
+        image: ImageAttachment | None = None,
         user_id: str,
         request_id: str,
         session_id: str,
