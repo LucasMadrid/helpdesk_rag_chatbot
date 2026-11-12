@@ -141,6 +141,9 @@ class PostgresSessionStore:
         """
         Return the messages of one of the user's sessions, oldest first.
 
+        Ownership is checked first, so the history is only read for the user
+        who owns the session.
+
         :param session_id: The session to read.
         :param user_id: The user who must own the session.
         :return: The session's messages in the order they were added.
@@ -152,8 +155,7 @@ class PostgresSessionStore:
         if await cur.fetchone() is None:
             raise SessionNotFound(session_id)
 
-        history = get_chat_history(self._conn, session_id)
-        return await history.aget_messages()
+        return await get_chat_history(self._conn, session_id).aget_messages()
 
 
 async def create_session_table_and_index(conn: AsyncConnection) -> None:
