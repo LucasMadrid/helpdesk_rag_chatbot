@@ -19,6 +19,6 @@ HELPDESK_PROMPT = ChatPromptTemplate.from_messages(
     messages=[
         ("system", SYSTEM_PROMPT),
         MessagesPlaceholder("history"),
-        ("human", "{question}"),
+        MessagesPlaceholder("question"),
     ]
 )

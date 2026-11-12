@@ -63,9 +63,8 @@ class ChatService:
             start_on="human",  # never start with an answer whose question was cut
         )
 
-        answer = await self.chain.ainvoke(
-            {"context": context, "history": kept, "question": message},
-            config={
+        callback_config = (
+            {
                 "callbacks": self.callbacks,
                 # Names are an API for Langfuse evaluators and dashboards: keep it
                 # verb-first, free of dynamic values, and stable.
@@ -83,6 +82,15 @@ class ChatService:
                     "history_messages_sent": len(kept),
                 },
             },
+        )
+
+        answer = await self.chain.ainvoke(
+            {
+                "context": context,
+                "history": kept,
+                "question": [HumanMessage(content=message)],
+            },
+            config=callback_config,
         )
 
         await history.aadd_messages(

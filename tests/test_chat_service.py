@@ -30,7 +30,9 @@ def test_reply_returns_fake_model_response():
 
 def test_prompt_renders_system_then_human_with_question():
     messages = HELPDESK_PROMPT.format_messages(
-        context="Use the portal.", history=[], question="How do I reset my password?"
+        context="Use the portal.",
+        history=[],
+        question=[HumanMessage(content="How do I reset my password?")],
     )
 
     assert len(messages) == 2
