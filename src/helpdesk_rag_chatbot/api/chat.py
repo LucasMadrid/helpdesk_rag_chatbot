@@ -17,6 +17,7 @@ from helpdesk_rag_chatbot.services.chat import ImageAttachment
 
 logger = logging.getLogger(__name__)
 
+
 def sniff_image_type(raw: bytes) -> str | None:
     if raw.startswith(b"\x89PNG\r\n\x1a\n"):
         return "image/png"
@@ -77,9 +78,7 @@ class ImageInput(BaseModel):
             )
 
         if sniff_image_type(raw) != self.media_type:
-            raise ValueError(
-                f"data is not a valid {self.media_type} image"
-            )
+            raise ValueError(f"data is not a valid {self.media_type} image")
 
         return self
 
