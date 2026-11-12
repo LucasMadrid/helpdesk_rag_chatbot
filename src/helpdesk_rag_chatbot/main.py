@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from importlib.metadata import version
 
 from fastapi import FastAPI
+from fastapi.exceptions import RequestValidationError
 from psycopg_pool import PoolTimeout
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -22,6 +23,7 @@ from helpdesk_rag_chatbot.api.errors import (
     db_pool_timeout_handler,
     llm_unavailable_handler,
     session_not_found_handler,
+    validation_error_handler,
 )
 from helpdesk_rag_chatbot.api.health import router as health_router
 from helpdesk_rag_chatbot.api.middleware import add_request_id
@@ -107,6 +109,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.add_exception_handler(exc_type, llm_unavailable_handler)
     app.add_exception_handler(PoolTimeout, db_pool_timeout_handler)
     app.add_exception_handler(SessionNotFound, session_not_found_handler)
+    app.add_exception_handler(RequestValidationError, validation_error_handler)
     # Register Routers
     app.include_router(health_router, tags=["health"])
     app.include_router(chat_router, tags=["chat"])

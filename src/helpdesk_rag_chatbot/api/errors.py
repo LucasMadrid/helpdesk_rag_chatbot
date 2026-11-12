@@ -1,6 +1,8 @@
 import logging
 
 from fastapi import Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
@@ -82,6 +84,34 @@ async def db_pool_timeout_handler(request: Request, exc: Exception) -> JSONRespo
         status_code=503,
         content={
             "detail": "The service is busy. Please try again.",
+            "request_id": request.state.request_id,
+        },
+    )
+
+
+async def validation_error_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """
+    Turn a request validation error into a 422 response that never echoes input.
+
+    FastAPI's default 422 repeats each field's ``input``, which for an image
+    would send megabytes of base64 back to the client (and into logs). ``ctx``
+    can hold the raw exception, which is not JSON-serialisable. Both are
+    dropped; ``type``, ``loc`` and ``msg`` stay, so the client still sees which
+    field failed and why. The request ID is added so the client can quote it.
+
+    :param request: The request that failed; its state holds the request ID.
+    :param exc: The ``RequestValidationError`` raised while validating the request.
+    :return: A 422 JSON response with the trimmed errors and the request ID.
+    """
+    errors = [
+        {k: v for k, v in e.items() if k not in ("input", "ctx")} for e in exc.errors()
+    ]
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": jsonable_encoder(errors),
             "request_id": request.state.request_id,
         },
     )
