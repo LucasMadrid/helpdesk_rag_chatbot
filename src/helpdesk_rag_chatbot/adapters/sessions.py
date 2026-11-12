@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import UUID
 
 from langchain_core.chat_history import BaseChatMessageHistory
+from langchain_core.messages import BaseMessage
 from psycopg import AsyncConnection, sql
 from psycopg.rows import class_row
 from pydantic import UUID7, BaseModel
@@ -50,6 +51,10 @@ WHERE session_id = %s and user_id = %s
 _DELETE_HISTORY = sql.SQL("DELETE FROM {} WHERE session_id = %s").format(
     sql.Identifier(CHAT_HISTORY_TABLE)
 )
+
+_OWNS_SESSION = """
+SELECT 1 FROM sessions WHERE session_id = %s AND user_id = %s
+"""
 
 
 class SessionNotFound(Exception):
@@ -131,6 +136,24 @@ class PostgresSessionStore:
                 raise SessionNotFound(session_id)
             # Delete the session from chat_history
             await self._conn.execute(_DELETE_HISTORY, (session_id,))
+
+    async def get_messages(self, session_id: UUID, user_id: UUID) -> list[BaseMessage]:
+        """
+        Return the messages of one of the user's sessions, oldest first.
+
+        :param session_id: The session to read.
+        :param user_id: The user who must own the session.
+        :return: The session's messages in the order they were added.
+        :raises SessionNotFound: If the session doesn't exist or belongs to
+            another user.
+        """
+        cur = await self._conn.execute(_OWNS_SESSION, (session_id, user_id))
+
+        if await cur.fetchone() is None:
+            raise SessionNotFound(session_id)
+
+        history = get_chat_history(self._conn, session_id)
+        return await history.aget_messages()
 
 
 async def create_session_table_and_index(conn: AsyncConnection) -> None:
