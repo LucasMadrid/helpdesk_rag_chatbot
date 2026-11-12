@@ -12,7 +12,7 @@ _ROLE = {"human": "user", "ai": "assistant"}
 
 
 class MessageOut(BaseModel):
-    role: str = Literal["user", "assistant"]
+    role: Literal["user", "assistant"]
     content: str
 
 
