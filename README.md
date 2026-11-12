@@ -124,8 +124,10 @@ TEST_APP_DB_URL=postgresql://helpdesk:<password>@127.0.0.1:5433/helpdesk \
   inject `.env` variables for you).
 - Each test uses new UUID7 user and session IDs and deletes its own rows
   afterwards, so it's safe to run against your local `app-db`.
-- CI has no Postgres yet, so these tests are skipped there. To run only the unit
-  tests locally, use `uv run pytest -m "not integration"`.
+- CI runs these tests against a `postgres:17` service container (see
+  `.github/workflows/ci.yml`), and `tests/conftest.py` stops the run with exit
+  code 4 if `TEST_APP_DB_URL` is missing there, so CI can't pass with them
+  skipped. To run only the unit tests locally, use `uv run pytest -m "not integration"`.
 - On Windows, psycopg's async mode doesn't work with the default Proactor event
   loop. The roundtrip script below switches to a `SelectorEventLoop`, but the
   integration tests don't yet, so run them on macOS, Linux or WSL.
