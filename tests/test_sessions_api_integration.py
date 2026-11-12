@@ -169,6 +169,7 @@ async def test_second_turn_sends_the_first_turn_from_postgres(
     ]
     assert await _history_rows(conn, session_id) == 4
 
+
 async def test_list_shows_only_the_callers_sessions_newest_first(
     client: httpx.AsyncClient, users: tuple[UUID, UUID]
 ) -> None:
