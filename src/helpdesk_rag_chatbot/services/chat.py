@@ -154,6 +154,8 @@ class ChatService:
 
         :param message: The input message to generate a reply for.
         :param context: The context to use for generating the reply.
+        :param image: An optional image to send to the model with the question.
+            It is not stored: the history keeps a text marker instead.
         :param user_id: The unique identifier of the user making the request.
         :param request_id: The unique identifier of the chat request.
         :param session_id: The unique identifier of the chat session.

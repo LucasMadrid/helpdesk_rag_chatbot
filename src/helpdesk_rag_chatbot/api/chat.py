@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def sniff_image_type(raw: bytes) -> str | None:
+    """Return the image MIME type that the leading bytes show, or None if unknown."""
     if raw.startswith(b"\x89PNG\r\n\x1a\n"):
         return "image/png"
     if raw.startswith(b"\xff\xd8\xff"):
@@ -30,6 +31,30 @@ def sniff_image_type(raw: bytes) -> str | None:
 
 MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB after decoding
 MAX_IMAGE_B64_CHARS = 4 * math.ceil(MAX_IMAGE_BYTES / 3)  # base64: 4 chars per 3 bytes
+
+
+class ImageInput(BaseModel):
+    """An image sent with a chat message, checked before it reaches the service."""
+
+    media_type: Literal["image/png", "image/jpeg", "image/webp"]
+    data: str = Field(min_length=1, max_length=MAX_IMAGE_B64_CHARS)
+
+    @model_validator(mode="after")
+    def check_bytes(self) -> Self:
+        try:
+            raw = base64.b64decode(self.data, validate=True)
+        except binascii.Error:
+            raise ValueError("data is not valid base64") from None
+
+        if len(raw) > MAX_IMAGE_BYTES:
+            raise ValueError(
+                f"image is larger than {MAX_IMAGE_BYTES // (1024 * 1024)} MB"
+            )
+
+        if sniff_image_type(raw) != self.media_type:
+            raise ValueError(f"data is not a valid {self.media_type} image")
+
+        return self
 
 
 class ChatRequest(BaseModel):
@@ -59,28 +84,6 @@ class ChatResponse(BaseModel):
         description="The server-generated unique identifier (UUIDv7) of this request. It is also attached to traces, so the client can quote it when reporting a problem."
     )
     answer: str = Field(description="The generated response text from the chatbot.")
-
-
-class ImageInput(BaseModel):
-    media_type: Literal["image/png", "image/jpeg", "image/webp"]
-    data: str = Field(min_length=1, max_length=MAX_IMAGE_B64_CHARS)
-
-    @model_validator(mode="after")
-    def check_bytes(self) -> Self:
-        try:
-            raw = base64.b64decode(self.data, validate=True)
-        except binascii.Error:
-            raise ValueError("data is not valid base64") from None
-
-        if len(raw) > MAX_IMAGE_BYTES:
-            raise ValueError(
-                f"image is larger than {MAX_IMAGE_BYTES // (1024 * 1024)} MB"
-            )
-
-        if sniff_image_type(raw) != self.media_type:
-            raise ValueError(f"data is not a valid {self.media_type} image")
-
-        return self
 
 
 router = APIRouter()
