@@ -1,6 +1,7 @@
 """Shared pytest fixtures."""
 
 import logging
+import os
 from collections.abc import Callable, Iterator
 
 import pytest
@@ -9,6 +10,17 @@ from fakes import FakePool
 from helpdesk_rag_chatbot import main
 from helpdesk_rag_chatbot.config import Settings
 from helpdesk_rag_chatbot.utils.logging_setup import _QUIET_LOGGERS
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Fail the whole run in CI if the integration tests could not run.
+
+    Without TEST_APP_DB_URL they skip, and a skip looks green. UsageError makes
+    pytest print the message and exit with code 4 before collecting anything.
+    """
+    if os.getenv("CI") and not os.getenv("TEST_APP_DB_URL"):
+        raise pytest.UsageError("CI must set TEST_APP_DB_URL")
+
 
 # Required settings only. LANGFUSE_ENABLED is deliberately absent, so a test can
 # check its default.

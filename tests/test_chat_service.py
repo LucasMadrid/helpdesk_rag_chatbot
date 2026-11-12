@@ -1,6 +1,7 @@
 import asyncio
 
 import pytest
+from fakes import PromptSpy
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.chat_history import InMemoryChatMessageHistory
 from langchain_core.language_models import FakeListChatModel
@@ -130,16 +131,6 @@ def test_reply_does_not_save_when_the_model_fails():
         asyncio.run(service.reply("q1", history=history, **IDS))
 
     assert history.messages == []
-
-
-class PromptSpy(BaseCallbackHandler):
-    """Keep each prompt (list of messages) the chat model received."""
-
-    def __init__(self) -> None:
-        self.prompts: list[list] = []
-
-    def on_chat_model_start(self, serialized, messages, **kwargs):
-        self.prompts.append(messages[0])
 
 
 def test_second_reply_sends_first_turn_to_the_model():

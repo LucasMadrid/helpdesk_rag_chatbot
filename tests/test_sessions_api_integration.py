@@ -17,6 +17,7 @@ from uuid import UUID, uuid7
 
 import httpx
 import pytest
+from fakes import PromptSpy
 from langchain_core.language_models import FakeListChatModel
 from psycopg import AsyncConnection
 
@@ -59,14 +60,22 @@ async def conn() -> AsyncIterator[AsyncConnection]:
 
 
 @pytest.fixture
-async def client(conn: AsyncConnection) -> AsyncIterator[httpx.AsyncClient]:
+def spy() -> PromptSpy:
+    """Records each prompt the (fake) chat model receives."""
+    return PromptSpy()
+
+
+@pytest.fixture
+async def client(
+    conn: AsyncConnection, spy: PromptSpy
+) -> AsyncIterator[httpx.AsyncClient]:
     """The real app over HTTP, using the test connection instead of the pool."""
 
     async def real_connection() -> AsyncIterator[AsyncConnection]:
         yield conn
 
     app = create_app()
-    service = ChatService(FakeListChatModel(responses=["answer"]))
+    service = ChatService(FakeListChatModel(responses=["answer"]), callbacks=[spy])
     app.dependency_overrides[get_chat_service] = lambda: service
     app.dependency_overrides[get_db_connection] = real_connection
     # raise_app_exceptions=False: an unhandled error becomes a 500 response, as
@@ -138,6 +147,27 @@ async def test_owner_chats_twice_and_another_user_gets_404(
     response = await _chat(client, user_b, session_id)
     assert response.status_code == 404
     assert response.json()["detail"] == "Session not found."
+
+
+async def test_second_turn_sends_the_first_turn_from_postgres(
+    client: httpx.AsyncClient,
+    conn: AsyncConnection,
+    spy: PromptSpy,
+    users: tuple[UUID, UUID],
+) -> None:
+    user_a, _ = users
+    session_id = uuid7()
+
+    await _chat(client, user_a, session_id, "My laptop is a Dell XPS")
+    await _chat(client, user_a, session_id, "What laptop do I have?")
+
+    # [1:] skips the system message.
+    assert [m.content for m in spy.prompts[1][1:]] == [
+        "My laptop is a Dell XPS",
+        "answer",
+        "What laptop do I have?",
+    ]
+    assert await _history_rows(conn, session_id) == 4
 
 
 async def test_list_shows_only_the_callers_sessions_newest_first(
