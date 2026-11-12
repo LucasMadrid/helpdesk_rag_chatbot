@@ -1,0 +1,40 @@
+# Look of the chat UI. Change colours, radius and fonts here; no CSS needed.
+# Streamlit picks [theme.light] or [theme.dark] from the viewer's system setting.
+# Every option: https://docs.streamlit.io/develop/api-reference/configuration/config.toml#theme
+
+[client]
+toolbarMode = "minimal"   # hide the developer menu
+
+[theme]
+baseRadius = "0.75rem"
+buttonRadius = "full"
+showWidgetBorder = true
+showSidebarBorder = true
+font = "sans-serif"
+headingFontWeights = [600, 600, 600, 600, 600, 600]
+
+[theme.light]
+primaryColor = "#4F46E5"            # the one accent: buttons, focus rings, links
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F6F6F4"
+textColor = "#1F1F1D"
+borderColor = "#E7E5E0"
+linkColor = "#4F46E5"
+codeTextColor = "#5B5A55"
+
+[theme.light.sidebar]
+backgroundColor = "#FAFAF8"
+secondaryBackgroundColor = "#EFEEEA"
+
+[theme.dark]
+primaryColor = "#6E68F0"
+backgroundColor = "#141413"
+secondaryBackgroundColor = "#232321"
+textColor = "#ECEBE7"
+borderColor = "#2F2E2B"
+linkColor = "#A5A2F7"
+codeTextColor = "#C9C7C1"
+
+[theme.dark.sidebar]
+backgroundColor = "#1A1A18"
+secondaryBackgroundColor = "#2A2A27"
