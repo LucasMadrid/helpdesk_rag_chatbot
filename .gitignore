@@ -225,3 +225,8 @@ __marimo__/
 
 # Manual scripts
 .scripts/
+
+
+.claude/
+.agents/
+tasks/

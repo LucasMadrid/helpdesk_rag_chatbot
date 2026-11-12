@@ -63,10 +63,12 @@ uv sync --extra ui
 uv run streamlit run src/helpdesk_rag_chatbot/ui/app.py
 ```
 
-It opens at http://localhost:8501. For now it runs on demo data kept in memory
-(`DemoBackend`), so it doesn't need the API; a grey "Demo data" badge says so.
-Type "simulate error" to see how errors look. The page only talks to a
-`ChatBackend` (`ui/backend.py`), never to the API code directly.
+It opens at http://localhost:8501 and calls the API at `HELPDESK_API_URL`
+(default `http://localhost:8000`), so start the API first. To try the page
+without the API, set `HELPDESK_DEMO=1`: it then runs on demo data kept in
+memory (`DemoBackend`), with a grey "Demo data" badge, and typing "simulate
+error" shows how errors look. The page only talks to a `ChatBackend`
+(`ui/backend.py`), never to the API code directly.
 
 Change the look and wording without touching code:
 

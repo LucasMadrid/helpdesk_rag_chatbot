@@ -374,6 +374,7 @@ dependencies = [
 
 [package.optional-dependencies]
 ui = [
+    { name = "httpx" },
     { name = "streamlit" },
 ]
 
@@ -388,6 +389,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "fastapi", specifier = ">=0.162.0" },
+    { name = "httpx", marker = "extra == 'ui'", specifier = ">=0.28.1" },
     { name = "langchain", specifier = ">=1.4.8" },
     { name = "langchain-openai", specifier = ">=1.7.3" },
     { name = "langchain-postgres", specifier = ">=0.0.19" },
