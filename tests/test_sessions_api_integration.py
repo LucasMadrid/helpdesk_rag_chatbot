@@ -17,6 +17,7 @@ from uuid import UUID, uuid7
 
 import httpx
 import pytest
+from fakes import PromptSpy
 from langchain_core.language_models import FakeListChatModel
 from psycopg import AsyncConnection
 
@@ -59,14 +60,22 @@ async def conn() -> AsyncIterator[AsyncConnection]:
 
 
 @pytest.fixture
-async def client(conn: AsyncConnection) -> AsyncIterator[httpx.AsyncClient]:
+def spy() -> PromptSpy:
+    """Records each prompt the (fake) chat model receives."""
+    return PromptSpy()
+
+
+@pytest.fixture
+async def client(
+    conn: AsyncConnection, spy: PromptSpy
+) -> AsyncIterator[httpx.AsyncClient]:
     """The real app over HTTP, using the test connection instead of the pool."""
 
     async def real_connection() -> AsyncIterator[AsyncConnection]:
         yield conn
 
     app = create_app()
-    service = ChatService(FakeListChatModel(responses=["answer"]))
+    service = ChatService(FakeListChatModel(responses=["answer"]), callbacks=[spy])
     app.dependency_overrides[get_chat_service] = lambda: service
     app.dependency_overrides[get_db_connection] = real_connection
     # raise_app_exceptions=False: an unhandled error becomes a 500 response, as
