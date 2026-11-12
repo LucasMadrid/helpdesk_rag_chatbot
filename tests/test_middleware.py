@@ -66,7 +66,12 @@ def test_header_body_and_service_share_one_id() -> None:
     request_id = response.headers[HEADER]
     assert response.json()["request_id"] == request_id
     reply.assert_awaited_once_with(
-        ANY, request_id=request_id, user_id=ANY, session_id=ANY, history=ANY
+        ANY,
+        request_id=request_id,
+        user_id=ANY,
+        session_id=ANY,
+        history=ANY,
+        image=None,
     )
 
 

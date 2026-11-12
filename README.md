@@ -38,6 +38,11 @@ Open http://127.0.0.1:8000/docs to try the endpoints:
 - `POST /chat` takes `user_id` and `session_id` (both UUID7) and a `message`
   (1 to 1000 characters), and returns an `answer` and a `request_id`. To get a
   UUID7, run `uv run python -c "import uuid; print(uuid.uuid7())"`.
+  An optional `image` (`{"media_type": "image/png", "data": "<base64>"}`) adds a
+  screenshot: PNG, JPEG or WebP, raw base64 without a `data:` prefix, at most
+  5 MB, otherwise `422`. The image goes to the model with the question but is
+  not stored; history keeps the text plus an `[image: <type>]` marker (see
+  [ADR 0008](docs/adr/0008-images-not-stored.md)).
 - `GET /sessions?user_id=<uuid7>` lists that user's sessions (`session_id`,
   `title`, `created_at`, `updated_at`), most recently used first, at most 50.
   A user with no sessions gets `[]`.
