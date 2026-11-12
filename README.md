@@ -52,6 +52,32 @@ Open http://127.0.0.1:8000/docs to try the endpoints:
 - `DELETE /sessions/{session_id}?user_id=<uuid7>` deletes the session and all
   its messages, and returns `204`.
 
+### Chat UI
+
+A Streamlit chat window: chat with an optional screenshot, list, reopen and
+delete chats, and switch between two demo users. Install the `ui` extra once,
+then run it from the repo root (so Streamlit finds `.streamlit/config.toml`):
+
+```bash
+uv sync --extra ui
+uv run streamlit run src/helpdesk_rag_chatbot/ui/app.py
+```
+
+It opens at http://localhost:8501. For now it runs on demo data kept in memory
+(`DemoBackend`), so it doesn't need the API; a grey "Demo data" badge says so.
+Type "simulate error" to see how errors look. The page only talks to a
+`ChatBackend` (`ui/backend.py`), never to the API code directly.
+
+Change the look and wording without touching code:
+
+| To change | Edit |
+|---|---|
+| Colours, corner radius, fonts, light and dark mode | `.streamlit/config.toml` |
+| Name, tagline, placeholder, starter questions, demo users | `ui.toml` |
+
+The demo users are not a login: like the API, the UI trusts the `user_id` it
+sends.
+
 ### Sessions and ownership
 
 There is no endpoint to create a session. The client makes a new UUID7, and the

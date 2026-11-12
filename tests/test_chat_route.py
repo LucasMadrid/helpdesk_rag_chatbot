@@ -269,6 +269,9 @@ def test_chat_rejects_an_invalid_image(
     assert response.status_code == 422
     assert [e["loc"] for e in response.json()["detail"]] == [loc]
     reply.assert_not_called()
+    body = response.json()
+    assert all("input" not in e for e in body["detail"])
+    assert UUID(body["request_id"]).version == 7
 
 
 def test_chat_rejects_an_image_one_byte_over_the_decoded_limit(
