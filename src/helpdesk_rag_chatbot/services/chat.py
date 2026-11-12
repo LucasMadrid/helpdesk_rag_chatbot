@@ -20,10 +20,21 @@ class ImageAttachment:
 class ChatService:
     """Generate helpdesk replies using a chat model.
 
+    Each reply loads the session's earlier turns (trimmed to a token budget),
+    sends them with the new question and an optional image to the model, and
+    saves the question and answer to the history only if the call succeeds. An
+    image is sent to the model but never stored: the history keeps a text
+    marker instead.
+
     Attributes:
         chat_model: The chat model used to generate replies.
+        history_max_tokens: Token budget for the earlier turns sent to the
+            model. Older turns are dropped from the prompt, not from the stored
+            history.
         callbacks: LangChain callback handlers run on every reply, for example
             tracing. An empty list means no callbacks.
+        chain: The prompt, chat model and output parser, built once and reused
+            for every reply.
     """
 
     def __init__(
@@ -76,7 +87,43 @@ class ChatService:
             },
         }
 
-    def _validate_image()
+    @staticmethod
+    def _build_question(message: str, image: ImageAttachment | None) -> HumanMessage:
+        """
+        Build the message sent to the model: plain text, or text plus the image.
+
+        :param message: The user's question.
+        :param image: The attached image, or None.
+        :return: A HumanMessage; with an image its content is a list of blocks.
+        """
+        if image is None:
+            return HumanMessage(content=message)
+        return HumanMessage(
+            content=[
+                {"type": "text", "text": message},
+                {
+                    "type": "image",
+                    "base64": image.data,
+                    "mime_type": image.mime_type,
+                },
+            ]
+        )
+
+    @staticmethod
+    def _history_text(message: str, image: ImageAttachment | None) -> str:
+        """
+        Build the text stored in the history for the user's turn.
+
+        The image itself is never stored, only a marker with its MIME type, so
+        the database does not fill up with base64.
+
+        :param message: The user's question.
+        :param image: The attached image, or None.
+        :return: The message, plus an ``[image: <mime type>]`` line if attached.
+        """
+        if image is None:
+            return message
+        return f"{message}\n[image: {image.mime_type}]"
 
     async def reply(
         self,
@@ -113,19 +160,7 @@ class ChatService:
             start_on="human",  # never start with an answer whose question was cut
         )
 
-        if image is None:
-            question = HumanMessage(content=message)
-        else:
-            question = HumanMessage(
-                content=[
-                    {"type": "text", "text": message},
-                    {
-                        "type": "image",
-                        "base64": image.data,
-                        "mime_type": image.mime_type,
-                    },
-                ]
-            )
+        question = self._build_question(message, image)
 
         answer = await self.chain.ainvoke(
             {
@@ -143,7 +178,7 @@ class ChatService:
             ),
         )
 
-        saved = message if image is None else f"{message}\n[image: {image.mime_type}]"
+        saved = self._history_text(message, image)
         await history.aadd_messages(
             [HumanMessage(content=saved), AIMessage(content=answer)]
         )
