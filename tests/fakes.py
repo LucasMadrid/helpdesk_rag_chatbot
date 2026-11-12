@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from uuid import UUID
 
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.chat_history import (
     BaseChatMessageHistory,
     InMemoryChatMessageHistory,
@@ -53,3 +54,13 @@ class FakeSessionStore:
         if self.owners.setdefault(session_id, user_id) != user_id:
             raise SessionNotFound(str(session_id))
         return InMemoryChatMessageHistory()
+
+
+class PromptSpy(BaseCallbackHandler):
+    """Keep each prompt (list of messages) the chat model received."""
+
+    def __init__(self) -> None:
+        self.prompts: list[list] = []
+
+    def on_chat_model_start(self, serialized, messages, **kwargs):
+        self.prompts.append(messages[0])
