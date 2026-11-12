@@ -269,3 +269,24 @@ def test_chat_rejects_an_invalid_image(
     assert response.status_code == 422
     assert [e["loc"] for e in response.json()["detail"]] == [loc]
     reply.assert_not_called()
+
+
+def test_chat_rejects_an_image_one_byte_over_the_decoded_limit(
+    make_client: ClientFactory,
+) -> None:
+    # One byte over still fits the base64 length cap, so the field accepts it and
+    # the validator's decoded-size check is the one that rejects it.
+    client, reply = make_client()
+    raw = PNG_BYTES + b"\x00" * (MAX_IMAGE_BYTES + 1 - len(PNG_BYTES))
+    assert len(raw) == MAX_IMAGE_BYTES + 1
+
+    response = client.post(
+        "/chat",
+        json=_payload(image={"media_type": "image/png", "data": _b64(raw)}),
+    )
+
+    assert response.status_code == 422
+    errors = response.json()["detail"]
+    assert [e["loc"] for e in errors] == [["body", "image"]]
+    assert "larger than 5 MB" in errors[0]["msg"]
+    reply.assert_not_called()
