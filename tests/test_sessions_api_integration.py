@@ -149,6 +149,26 @@ async def test_owner_chats_twice_and_another_user_gets_404(
     assert response.json()["detail"] == "Session not found."
 
 
+async def test_second_turn_sends_the_first_turn_from_postgres(
+    client: httpx.AsyncClient,
+    conn: AsyncConnection,
+    spy: PromptSpy,
+    users: tuple[UUID, UUID],
+) -> None:
+    user_a, _ = users
+    session_id = uuid7()
+
+    await _chat(client, user_a, session_id, "My laptop is a Dell XPS")
+    await _chat(client, user_a, session_id, "What laptop do I have?")
+
+    # [1:] skips the system message.
+    assert [m.content for m in spy.prompts[1][1:]] == [
+        "My laptop is a Dell XPS",
+        "answer",
+        "What laptop do I have?",
+    ]
+    assert await _history_rows(conn, session_id) == 4
+
 async def test_list_shows_only_the_callers_sessions_newest_first(
     client: httpx.AsyncClient, users: tuple[UUID, UUID]
 ) -> None:
