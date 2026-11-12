@@ -12,6 +12,23 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Throwaway database for the integration tests; the password is not a secret.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: helpdesk
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: helpdesk
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U helpdesk"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_APP_DB_URL: postgresql://helpdesk:ci-only-password@localhost:5432/helpdesk
     steps:
       - uses: actions/checkout@v4
 
