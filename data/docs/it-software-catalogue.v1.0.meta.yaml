@@ -1,0 +1,9 @@
+doc_id: it-software-catalogue
+file: it-software-catalogue.v1.0.xlsx
+title: Approved Software Catalogue and Requests
+version: "1.0"
+valid_from: "2026-02-02"
+status: current
+area: IT
+owner: End-User Computing
+tags: [software, catalogue, licences, DeviceDock, admin rights]
