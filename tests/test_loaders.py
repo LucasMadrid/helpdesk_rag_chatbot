@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+import yaml
 from openpyxl import Workbook
 
 from helpdesk_rag_chatbot.ingestion.loaders import (
@@ -13,18 +14,16 @@ DOCS_DIR = Path(__file__).parents[1] / "data" / "docs"
 
 
 @pytest.mark.parametrize(
-    ("file_name", "doc_id"),
-    [
-        ("it-vpn-guide.v1.0.md", "it-vpn-guide"),
-        ("hr-leave-policy.v1.0.pdf", "hr-leave-policy"),
-        ("it-software-catalogue.v1.0.xlsx", "it-software-catalogue"),
-    ],
-    ids=["markdown", "pdf", "xlsx"],
+    "file_name",
+    ["hr-leave-policy.v1.0.pdf", "it-software-catalogue.v1.0.xlsx"],
+    ids=["pdf", "xlsx"],
 )
-def test_read_metadata_reads_real_corpus_files(file_name: str, doc_id: str) -> None:
-    metadata = read_metadata(DOCS_DIR / file_name)
-    assert metadata["doc_id"] == doc_id
-    assert metadata["version"] == "1.0"
+def test_pdf_and_xlsx_metadata_comes_from_sidecar(file_name: str) -> None:
+    path = DOCS_DIR / file_name
+    sidecar = yaml.safe_load(path.with_suffix(".meta.yaml").read_text(encoding="utf-8"))
+    metadata = read_metadata(path)
+    assert metadata == sidecar
+    assert metadata["file"] == file_name
 
 
 def test_read_metadata_reads_markdown_front_matter(tmp_path: Path) -> None:
@@ -137,7 +136,7 @@ def test_load_document_gives_each_version_its_own_id() -> None:
     )
 
 
-def test_load_document_rejects_unsupported_file_type(tmp_path: Path) -> None:
+def test_unsupported_suffix_raises(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match=r"x\.docx"):
         load_document(tmp_path / "x.docx")
 
