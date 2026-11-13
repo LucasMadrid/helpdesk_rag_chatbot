@@ -1,0 +1,9 @@
+doc_id: hr-expense-travel-policy
+file: hr-expense-travel-policy.v1.0.pdf
+title: Expense and Travel Policy
+version: "1.0"
+valid_from: "2025-01-01"
+status: current
+area: HR
+owner: Finance
+tags: [expenses, travel, hotel, per diem, mileage, receipts]
