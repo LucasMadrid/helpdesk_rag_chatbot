@@ -185,3 +185,22 @@ def load_document(path: Path) -> Document:
             "file_type": path.suffix.lstrip("."),
         },
     )
+
+
+def load_corpus(docs_dir: Path) -> list[Document]:
+    """
+    Load every supported document in a folder, in file-name order.
+
+    Sidecars (``.meta.yaml``) and other unsupported files are skipped, and
+    sub-folders are not searched.
+
+    :param docs_dir: The corpus folder, e.g. ``data/docs``.
+    :return: One ``Document`` per supported file, sorted by file name.
+    """
+
+    filtered_paths = sorted(
+        path
+        for path in docs_dir.iterdir()
+        if path.is_file() and path.suffix in SUPPORTED_SUFFIXES
+    )
+    return [load_document(path) for path in filtered_paths]

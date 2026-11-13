@@ -5,6 +5,7 @@ import yaml
 from openpyxl import Workbook
 
 from helpdesk_rag_chatbot.ingestion.loaders import (
+    load_corpus,
     load_document,
     read_metadata,
     read_text,
@@ -152,3 +153,27 @@ def test_load_document_gives_every_format_the_same_metadata_keys() -> None:
     }
     assert all("file" not in k for k in keys.values()), keys
     assert len({frozenset(k) for k in keys.values()}) == 1, keys
+
+
+def test_load_corpus_loads_every_real_document() -> None:
+    documents = load_corpus(DOCS_DIR)
+    assert len(documents) == 17
+    assert {d.metadata["file_type"] for d in documents} == {"md", "pdf", "xlsx"}
+
+
+def test_load_corpus_skips_unsupported_files_and_subfolders(tmp_path: Path) -> None:
+    (tmp_path / "x.v1.0.md").write_text(
+        '---\ndoc_id: x\nversion: "1.0"\n---\n\nBody\n', encoding="utf-8"
+    )
+    (tmp_path / "notes.txt").write_text("not a document", encoding="utf-8")
+    nested = tmp_path / "archive"
+    nested.mkdir()
+    (nested / "y.v1.0.md").write_text(
+        '---\ndoc_id: y\nversion: "1.0"\n---\n\nBody\n', encoding="utf-8"
+    )
+    assert [d.id for d in load_corpus(tmp_path)] == ["x@1.0"]
+
+
+def test_load_corpus_returns_documents_in_file_name_order() -> None:
+    sources = [d.metadata["source"] for d in load_corpus(DOCS_DIR)]
+    assert sources == sorted(sources)
