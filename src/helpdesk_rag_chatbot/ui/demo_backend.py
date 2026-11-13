@@ -27,6 +27,8 @@ class _Session:
 
 
 class DemoBackend:
+    """A ``ChatBackend`` that keeps sessions in memory and gives a fixed answer."""
+
     def __init__(self) -> None:
         self._sessions: dict[UUID, _Session] = {}
 
@@ -37,6 +39,20 @@ class DemoBackend:
         message: str,
         image: tuple[str, bytes] | None = None,
     ) -> ChatReply:
+        """
+        Store the message and return the demo answer.
+
+        A message containing "simulate error" raises a 503 instead.
+
+        :param user_id: The user sending the message.
+        :param session_id: The chat to add the message to; a new id creates it.
+        :param message: The user's text.
+        :param image: An optional ``(mime_type, raw_bytes)`` screenshot, stored
+            only as a marker.
+        :return: The demo reply.
+        :raises ApiError: 503 on "simulate error", 404 if the session belongs to
+            another user.
+        """
         if "simulate error" in message.lower():
             raise ApiError(
                 503,
@@ -59,6 +75,12 @@ class DemoBackend:
         return ChatReply(DEMO_ANSWER, str(uuid7()))
 
     def list_sessions(self, user_id: UUID) -> list[SessionInfo]:
+        """
+        List a user's chats, most recently updated first, at most 50.
+
+        :param user_id: The user whose chats to list.
+        :return: The user's sessions.
+        """
         mine = [
             SessionInfo(sid, s.title, s.updated_at)
             for sid, s in self._sessions.items()
@@ -67,9 +89,24 @@ class DemoBackend:
         return sorted(mine, key=lambda s: s.updated_at, reverse=True)[:50]
 
     def get_messages(self, session_id: UUID, user_id: UUID) -> list[Message]:
+        """
+        Return a copy of a chat's messages, oldest first.
+
+        :param session_id: The chat to read.
+        :param user_id: The user who owns the chat.
+        :return: The chat's messages.
+        :raises ApiError: 404 if the chat doesn't exist or isn't the user's.
+        """
         return list(self._owned(session_id, user_id).messages)
 
     def delete_session(self, session_id: UUID, user_id: UUID) -> None:
+        """
+        Delete a chat and all its messages.
+
+        :param session_id: The chat to delete.
+        :param user_id: The user who owns the chat.
+        :raises ApiError: 404 if the chat doesn't exist or isn't the user's.
+        """
         self._owned(session_id, user_id)
         del self._sessions[session_id]
 

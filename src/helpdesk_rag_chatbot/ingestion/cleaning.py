@@ -53,6 +53,7 @@ def remove_page_furniture(pages: list[str]) -> list[str]:
     repeated = set.intersection(*edge_sets) if len(edge_sets) >= 2 else set()
 
     def is_furniture(line: str, index: int, line_count: int) -> bool:
+        """Tell whether a line near a page edge is a repeated line or page number."""
         at_edge = index < EDGE_LINES or index >= line_count - EDGE_LINES
         text = line.strip()
         return at_edge and (text in repeated or PAGE_NUMBER.fullmatch(text) is not None)

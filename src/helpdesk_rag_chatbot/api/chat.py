@@ -41,6 +41,13 @@ class ImageInput(BaseModel):
 
     @model_validator(mode="after")
     def check_bytes(self) -> Self:
+        """
+        Check that ``data`` decodes to an image of the declared type and size.
+
+        :return: The validated attachment.
+        :raises ValueError: If ``data`` is not base64, is over the size limit,
+            or its bytes don't match ``media_type``.
+        """
         try:
             raw = base64.b64decode(self.data, validate=True)
         except binascii.Error:

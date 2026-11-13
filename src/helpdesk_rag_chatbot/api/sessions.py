@@ -12,6 +12,8 @@ _ROLE = {"human": "user", "ai": "assistant"}
 
 
 class MessageOut(BaseModel):
+    """One stored chat message as returned by the API."""
+
     role: Literal["user", "assistant"]
     content: str
 

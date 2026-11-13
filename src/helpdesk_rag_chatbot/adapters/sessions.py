@@ -62,6 +62,8 @@ class SessionNotFound(Exception):
 
 
 class SessionSummary(BaseModel):
+    """One chat session as listed to its owner: id, title and timestamps."""
+
     session_id: UUID7
     title: str
     created_at: datetime
