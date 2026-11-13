@@ -158,7 +158,20 @@ def test_load_document_gives_every_format_the_same_metadata_keys() -> None:
 def test_load_corpus_loads_every_real_document() -> None:
     documents = load_corpus(DOCS_DIR)
     assert len(documents) == 17
+    assert len({d.id for d in documents}) == 17
     assert {d.metadata["file_type"] for d in documents} == {"md", "pdf", "xlsx"}
+
+
+def test_metadata_values_are_pinecone_safe() -> None:
+    # Pinecone accepts strings, numbers, booleans and lists of strings; a date,
+    # None or nested dict would be rejected when the vectors are upserted.
+    for document in load_corpus(DOCS_DIR):
+        for key, value in document.metadata.items():
+            where = f"{document.id}: {key}={value!r}"
+            if isinstance(value, list):
+                assert all(isinstance(item, str) for item in value), where
+            else:
+                assert isinstance(value, (str, int, float, bool)), where
 
 
 def test_load_corpus_skips_unsupported_files_and_subfolders(tmp_path: Path) -> None:
