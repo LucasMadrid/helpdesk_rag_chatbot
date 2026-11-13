@@ -66,12 +66,12 @@ DbConnectionDependency = Annotated[
 
 
 async def get_session_store(conn: DbConnectionDependency) -> PostgresSessionStore:
-    """Create a session store backed by the request's database connection.
+    """
+    Create a session store backed by the request's database connection.
 
     :param conn: The pooled connection provided for this request.
     :return: A PostgreSQL session store using ``conn``.
     """
-
     return PostgresSessionStore(conn)
 
 

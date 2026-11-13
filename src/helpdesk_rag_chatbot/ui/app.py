@@ -24,6 +24,11 @@ BOT_AVATAR = ":material/support_agent:"
 
 @st.cache_data
 def load_ui_config() -> dict:
+    """
+    Read the UI words, starter prompts and demo users from ``ui.toml``.
+
+    :return: The parsed ``ui.toml``, cached for the server's lifetime.
+    """
     with UI_TOML.open("rb") as f:
         return tomllib.load(f)
 
@@ -59,11 +64,17 @@ state.setdefault("pending", None)  # a starter prompt that was clicked
 
 
 def start_new_chat() -> None:
+    """Clear the screen and give the next message a fresh session id."""
     state.session_id = uuid7()
     state.messages = []
 
 
 def open_chat(session_id: UUID) -> None:
+    """
+    Load a past chat onto the screen, or show a toast if it can't be loaded.
+
+    :param session_id: The chat to open.
+    """
     try:
         history = client.get_messages(session_id, UUID(state.user["id"]))
     except ApiError as e:
@@ -74,6 +85,12 @@ def open_chat(session_id: UUID) -> None:
 
 
 def friendly_error(e: ApiError) -> str:
+    """
+    Turn a backend error into a message for the user.
+
+    :param e: The error raised by the backend.
+    :return: Text to show in a toast or error box.
+    """
     if e.status is None:
         return "Can't reach the helpdesk service. Is the API running?"
     if e.status == 404:
@@ -85,6 +102,12 @@ def friendly_error(e: ApiError) -> str:
 
 @st.dialog("Delete this chat?")
 def confirm_delete(session_id: UUID, title: str) -> None:
+    """
+    Ask before deleting a chat, then delete it and start a new one.
+
+    :param session_id: The chat to delete.
+    :param title: The chat's title, shown in the dialog.
+    """
     st.write(f"**{title}** and all its messages will be deleted. This can't be undone.")
     left, right = st.columns(2)
     if left.button("Cancel", width="stretch"):
@@ -155,6 +178,11 @@ with st.sidebar:
 
 # ---- main: one chat ---------------------------------------------------------
 def render(msg: dict) -> None:
+    """
+    Draw one chat message with its avatar, image or marker, and request id.
+
+    :param msg: A message dict from ``state.messages``.
+    """
     avatar = USER_AVATAR if msg["role"] == "user" else BOT_AVATAR
     with st.chat_message(msg["role"], avatar=avatar):
         text, has_marker, _ = msg["content"].partition(IMAGE_MARKER)

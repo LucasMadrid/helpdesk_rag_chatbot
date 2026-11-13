@@ -43,3 +43,22 @@ The `pre-commit` hook runs ruff (lint and format) and basic file checks; the `pr
 - Vendors (LLM, vector store, history, tracing) are only imported in `src/helpdesk_rag_chatbot/adapters`.
 - Secrets live in `.env` (never committed); document every setting in `.env.example`.
 - Tests must run without network access or API keys.
+- Every function, method and class in `src/` has a docstring (tests don't need one). Use this layout:
+
+  ```python
+  def get_splitter(name: str, chunk_size: int, chunk_overlap: int) -> TextSplitter:
+      """
+      Look up a splitter factory by name in ``SPLITTERS`` and build it.
+
+      Optional details: what it does that the signature doesn't say.
+
+      :param name: Registry key of the splitter, e.g. ``recursive``.
+      :return: The configured ``TextSplitter``.
+      :raises ValueError: If ``name`` is not in ``SPLITTERS``.
+      """
+  ```
+
+  - A docstring with only a summary stays on one line: `"""Return the cached settings."""`.
+  - Otherwise the opening `"""` is on its own line, then a one-line summary, then a blank line before the details and another before the fields.
+  - Fields are reST (`:param:`, `:return:`, `:raises:`, `:ivar:` for class attributes), not Google-style `Args:` or `Returns:`. Indent continuation lines by four spaces.
+  - Code names are in double backticks: ``` ``start_index`` ```.

@@ -24,7 +24,8 @@ class ImageAttachment:
 
 
 class ChatService:
-    """Generate helpdesk replies using a chat model.
+    """
+    Generate helpdesk replies using a chat model.
 
     Each reply loads the session's earlier turns (trimmed to a token budget),
     sends them with the new question and an optional image to the model, and
@@ -32,15 +33,14 @@ class ChatService:
     image is sent to the model but never stored: the history keeps a text
     marker instead.
 
-    Attributes:
-        chat_model: The chat model used to generate replies.
-        history_max_tokens: Token budget for the earlier turns sent to the
-            model. Older turns are dropped from the prompt, not from the stored
-            history.
-        callbacks: LangChain callback handlers run on every reply, for example
-            tracing. An empty list means no callbacks.
-        chain: The prompt, chat model and output parser, built once and reused
-            for every reply.
+    :ivar chat_model: The chat model used to generate replies.
+    :ivar history_max_tokens: Token budget for the earlier turns sent to the
+        model. Older turns are dropped from the prompt, not from the stored
+        history.
+    :ivar callbacks: LangChain callback handlers run on every reply, for
+        example tracing. An empty list means no callbacks.
+    :ivar chain: The prompt, chat model and output parser, built once and
+        reused for every reply.
     """
 
     def __init__(
@@ -67,8 +67,10 @@ class ChatService:
         image: ImageAttachment | None,
     ) -> RunnableConfig:
         """
-        Build the LangChain run config for one reply: callbacks, run name and
-        the metadata that tracing (Langfuse) uses to group and filter traces.
+        Build the LangChain run config for one reply.
+
+        It holds the callbacks, the run name and the metadata that tracing
+        (Langfuse) uses to group and filter traces.
 
         :param user_id: The unique identifier of the user making the request.
         :param session_id: The unique identifier of the chat session.
