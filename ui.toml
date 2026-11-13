@@ -1,6 +1,6 @@
 # Words and defaults of the chat UI. Change these without touching code.
 
-assistant_name = "Northwind Helpdesk"
+assistant_name = "Corvane Helpdesk"
 tagline = "Ask about IT and HR policies, or drop a screenshot of an error."
 input_placeholder = "Ask a question or attach a screenshot"
 
