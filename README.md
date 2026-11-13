@@ -1,6 +1,8 @@
 # helpdesk_rag_chatbot
 
-A RAG chatbot oriented to Helpdesk about a fictional company
+A RAG chatbot for the IT and HR helpdesk of Corvane Logistics Software, a
+fictional company. Its documents live in `data/docs/` (see
+[Document corpus](#document-corpus)).
 
 ## Run it locally
 
@@ -173,3 +175,31 @@ reuse a session. Unlike the tests, it leaves its rows in the table so you can
 look at them with `psql`.
 
 For the branch flow and pre-commit setup, see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Document corpus
+
+`data/docs/` holds the documents the bot answers from: 17 documents for 15
+`doc_id`s (14 Markdown, 2 PDF, 1 Excel). They were AI-generated for this
+project; the company, people and `example.com` addresses are made up.
+
+Every document carries the same metadata: `doc_id`, `title`, `version`,
+`valid_from`, `status` (`current` or `superseded`) and `area` (`IT`, `HR` or
+`General`); old versions also have `valid_to`. A Markdown file keeps it in YAML
+front matter. A PDF or Excel file can't, so it gets a sidecar with the same name
+and `.meta.yaml` (plus `file`, the document's name):
+
+| Document | Metadata in |
+|---|---|
+| `it-vpn-guide.v1.0.md` | its front matter |
+| `hr-leave-policy.v1.0.pdf` | `hr-leave-policy.v1.0.meta.yaml` |
+
+Files are named `{doc_id}.v{version}.{ext}`. Two documents,
+`it-password-mfa-policy` and `hr-remote-work-policy`, ship an old and a current
+version whose facts disagree, so retrieval can be tested on keeping only the
+current one. Some topics (parking, the canteen) are left out on purpose to test
+"I don't know".
+
+To add a document, follow the same naming and metadata, then run
+`uv run pytest tests/test_corpus.py`: it checks the metadata, the file names
+and that each `doc_id` has exactly one current version. Starter eval questions
+are in `evals/seed_questions.md`.
