@@ -33,7 +33,9 @@ def _meta(path: Path) -> dict[str, Any]:
     """
     if path.suffix == ".md":
         return frontmatter.load(path).metadata
-    meta: dict[str, Any] = yaml.safe_load(path.with_suffix(".meta.yaml").read_text())
+    meta: dict[str, Any] = yaml.safe_load(
+        path.with_suffix(".meta.yaml").read_text(encoding="utf-8")
+    )
     return meta
 
 
@@ -83,7 +85,7 @@ def test_file_name_matches_doc_id_and_version(path: Path) -> None:
 
 @pytest.mark.parametrize("sidecar", SIDECARS, ids=lambda p: p.name)
 def test_every_sidecar_file_exists(sidecar: Path) -> None:
-    meta = yaml.safe_load(sidecar.read_text())
+    meta = yaml.safe_load(sidecar.read_text(encoding="utf-8"))
     assert "file" in meta, "sidecar has no 'file' key"
     assert (DOCS_DIR / meta["file"]).is_file(), f"{meta['file']} not found"
 

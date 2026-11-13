@@ -222,6 +222,14 @@ __marimo__/
 # VS Code
 .vscode/
 
+# macOS Finder metadata
+.DS_Store
+
 
 # Manual scripts
 .scripts/
+
+# AI folders & local task tracking
+.claude/
+tasks/
+.agents/
