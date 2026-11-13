@@ -203,3 +203,21 @@ To add a document, follow the same naming and metadata, then run
 `uv run pytest tests/test_corpus.py`: it checks the metadata, the file names
 and that each `doc_id` has exactly one current version. Starter eval questions
 are in `evals/seed_questions.md`.
+
+### Loading the corpus
+
+`helpdesk_rag_chatbot.ingestion` turns the corpus into LangChain `Document`s,
+one per file. Nothing is split or embedded yet.
+
+```bash
+uv run python -c "from pathlib import Path; from helpdesk_rag_chatbot.ingestion.loaders import load_corpus; print(len(load_corpus(Path('data/docs'))))"
+# 17
+```
+
+- The reader is picked by suffix: `.md` (body without front matter), `.pdf`
+  (`pypdf`, running header and `Page N` lines removed), `.xlsx` (`openpyxl`,
+  one `## <sheet>` section per sheet, rows as `Header: value | Header: value`).
+- Every text goes through `clean_text`: Unicode NFKC, `\n` line endings,
+  stripped lines, at most one blank line in a row.
+- `Document.id` is `{doc_id}@{version}`. The metadata is the front matter or
+  sidecar (without `file`) plus `source` (the file name) and `file_type`.
