@@ -34,7 +34,8 @@ def test_sending_a_message_shows_question_answer_and_lists_the_chat(
     app.chat_input[0].set_value("How do I reset my password?").run()
 
     assert [m.name for m in app.chat_message] == ["user", "assistant"]
-    assert any(b.label.startswith("How do I reset") for b in app.sidebar.button)
+    # The chat just started is the open one, so its title is shown in bold.
+    assert any(b.label.startswith("**How do I reset") for b in app.sidebar.button)
 
 
 def test_a_backend_error_is_shown_in_the_chat(app: AppTest) -> None:
@@ -68,8 +69,11 @@ def test_clicking_a_chat_in_the_sidebar_reopens_it(app: AppTest) -> None:
 
 def test_chats_are_listed_under_a_day_heading(app: AppTest) -> None:
     app.chat_input[0].set_value("Printer is offline").run()
+    # Leave the chat, so it is listed under its day instead of "Current".
+    next(b for b in app.sidebar.button if b.label == "New chat").click().run()
 
     assert "TODAY" in [c.value for c in app.sidebar.caption]
+    assert "CURRENT" not in [c.value for c in app.sidebar.caption]
 
 
 def test_an_answer_shows_its_time_and_a_copyable_request_id(app: AppTest) -> None:
@@ -86,3 +90,30 @@ def test_an_error_answer_still_carries_its_request_id(app: AppTest) -> None:
 
     [ref] = app.chat_message[1].code
     assert UUID(ref.value).version == 7
+
+
+def _chat_titles(app: AppTest) -> list[str]:
+    return [
+        b.label.strip("*")
+        for b in app.sidebar.button
+        if (b.key or "").startswith("s-")  # chat rows; "New chat" has no key
+    ]
+
+
+def test_the_open_chat_moves_to_the_top_and_returns_when_only_read(
+    app: AppTest,
+) -> None:
+    for question in ("first question", "second question", "third question"):
+        app.chat_input[0].set_value(question).run()
+        next(b for b in app.sidebar.button if b.label == "New chat").click().run()
+    assert _chat_titles(app) == ["third question", "second question", "first question"]
+
+    # Open the oldest chat: it is lifted into "Current", the rest keep their order.
+    next(b for b in app.sidebar.button if "first question" in b.label).click().run()
+    assert _chat_titles(app) == ["first question", "third question", "second question"]
+    headings = [c.value for c in app.sidebar.caption if c.value.isupper()]
+    assert headings == ["CURRENT", "TODAY"]
+
+    # Open another without writing: the first goes back to its old place.
+    next(b for b in app.sidebar.button if "second question" in b.label).click().run()
+    assert _chat_titles(app) == ["second question", "third question", "first question"]

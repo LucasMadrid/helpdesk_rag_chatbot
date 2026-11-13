@@ -6,7 +6,7 @@ from uuid import uuid7
 import pytest
 
 from helpdesk_rag_chatbot.ui.backend import SessionInfo
-from helpdesk_rag_chatbot.ui.sidebar import ago, group_by_day, short
+from helpdesk_rag_chatbot.ui.sidebar import ago, current_first, group_by_day, short
 
 NOW = datetime(2026, 11, 12, 12, 0, tzinfo=UTC)
 
@@ -55,3 +55,41 @@ def test_group_by_day_leaves_out_empty_groups() -> None:
     assert group_by_day([], now=NOW) == []
     [(label, _)] = group_by_day([_session(timedelta(days=30))], now=NOW)
     assert label == "Older"
+
+
+def _titles(
+    sections: list[tuple[str, list[SessionInfo]]],
+) -> list[tuple[str, list[str]]]:
+    return [(label, [s.title for s in group]) for label, group in sections]
+
+
+def test_current_first_lifts_the_open_chat_above_the_day_groups() -> None:
+    a = _session(timedelta(minutes=5), "a")
+    b = _session(timedelta(minutes=30), "b")
+    c = _session(timedelta(days=1), "c")
+
+    sections = current_first([a, b, c], b.session_id, now=NOW)
+
+    assert _titles(sections) == [
+        ("Current", ["b"]),
+        ("Today", ["a"]),
+        ("Yesterday", ["c"]),
+    ]
+
+
+def test_opening_another_chat_puts_the_previous_one_back_in_its_place() -> None:
+    a = _session(timedelta(minutes=5), "a")
+    b = _session(timedelta(minutes=30), "b")
+    c = _session(timedelta(minutes=50), "c")
+    sessions = [a, b, c]
+
+    current_first(sessions, b.session_id, now=NOW)
+    sections = current_first(sessions, c.session_id, now=NOW)
+
+    assert _titles(sections) == [("Current", ["c"]), ("Today", ["a", "b"])]
+
+
+def test_without_an_open_listed_chat_there_is_no_current_section() -> None:
+    a = _session(timedelta(minutes=5), "a")
+
+    assert _titles(current_first([a], uuid7(), now=NOW)) == [("Today", ["a"])]

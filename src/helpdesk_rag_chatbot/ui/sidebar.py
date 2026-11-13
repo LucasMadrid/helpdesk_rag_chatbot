@@ -1,6 +1,7 @@
 """Pure helpers for the sidebar's chat list: grouping, short titles, ages."""
 
 from datetime import UTC, datetime
+from uuid import UUID
 
 from helpdesk_rag_chatbot.ui.backend import SessionInfo
 
@@ -47,3 +48,18 @@ def group_by_day(
             label = "Older"
         groups.setdefault(label, []).append(session)
     return list(groups.items())
+
+
+def current_first(
+    sessions: list[SessionInfo], current_id: UUID, now: datetime | None = None
+) -> list[tuple[str, list[SessionInfo]]]:
+    """
+    Put the open chat in its own "Current" section, above the day groups.
+
+    The other chats keep their usual day groups and order. Opening a chat does
+    not change its ``updated_at`` (only sending a message does), so when another
+    chat is opened this one goes back to exactly where it was before.
+    """
+    current = [s for s in sessions if s.session_id == current_id]
+    others = [s for s in sessions if s.session_id != current_id]
+    return ([("Current", current)] if current else []) + group_by_day(others, now)

@@ -19,7 +19,7 @@ import streamlit as st
 from helpdesk_rag_chatbot.ui.api_client import HelpdeskClient
 from helpdesk_rag_chatbot.ui.backend import ApiError, ChatBackend
 from helpdesk_rag_chatbot.ui.demo_backend import DemoBackend
-from helpdesk_rag_chatbot.ui.sidebar import SEARCH_MIN_CHATS, ago, group_by_day, short
+from helpdesk_rag_chatbot.ui.sidebar import SEARCH_MIN_CHATS, ago, current_first, short
 
 UI_TOML = Path(__file__).resolve().parents[3] / "ui.toml"
 IMAGE_MARKER = "\n[image: "  # what history stores instead of an image (ADR 0008)
@@ -122,6 +122,9 @@ CHAT_LIST_CSS = (
     ".st-key-chatlist { "
     f"height: calc(100vh - {CHAT_LIST_OFFSET_REM}rem) !important; "
     "overflow-y: auto !important; }"
+    # The open chat: its whole row (title, age, menu) gets a soft accent fill.
+    ".st-key-current-chat { "
+    "background-color: rgba(110, 104, 240, 0.18); border-radius: 0.75rem; }"
 )
 with st.sidebar:
     st.html(f"<style>{CHAT_LIST_CSS}</style>")
@@ -162,21 +165,22 @@ with st.sidebar:
     # The list has a fixed height (see CHAT_LIST_CSS) and scrolls inside it, so the
     # profile below it stays at the bottom whether there are 3 chats or 50.
     with st.container(key="chatlist"):
-        for day, group in group_by_day(shown):
+        for day, group in current_first(shown, state.session_id):
             st.caption(day.upper())
             for s in group:
+                current = s.session_id == state.session_id
                 # Columns, not a horizontal container: that one wraps the age and
                 # the menu onto a second line when the full-width button fills it.
-                title_col, age_col, menu_col = st.columns(
+                row = st.container(key="current-chat" if current else None)
+                title_col, age_col, menu_col = row.columns(
                     [6, 2, 1.3], vertical_alignment="center", gap="xsmall"
                 )
+                title = short(s.title, 20)
                 title_col.button(
-                    short(s.title, 20),
+                    f"**{title}**" if current else title,
                     key=f"s-{s.session_id}",
                     icon=":material/chat_bubble:",
-                    type="secondary"
-                    if s.session_id == state.session_id
-                    else "tertiary",
+                    type="tertiary",
                     width="stretch",
                     help=s.title,
                     on_click=open_chat,
