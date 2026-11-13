@@ -17,7 +17,13 @@ REQUIRED_ENV = {
     "LANGFUSE_BASE_URL": "http://localhost:3000",
     "APP_DB_URL": "postgresql://user:pw@localhost:5432/app",
 }
-OPTIONAL_ENV = ["LLM_TIMEOUT", "HISTORY_MAX_TOKENS"]
+OPTIONAL_ENV = [
+    "LLM_TIMEOUT",
+    "HISTORY_MAX_TOKENS",
+    "SPLITTER",
+    "CHUNK_SIZE",
+    "CHUNK_OVERLAP",
+]
 
 
 @pytest.fixture(autouse=True)
@@ -76,6 +82,23 @@ def test_history_max_tokens_of_zero_is_rejected(
     full_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("HISTORY_MAX_TOKENS", "0")
+
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_splitter_settings_defaults(full_env: dict[str, str]) -> None:
+    settings = Settings()
+
+    assert settings.splitter == "recursive"
+    assert settings.chunk_size == 800
+    assert settings.chunk_overlap == 100
+
+
+def test_chunk_size_must_be_positive(
+    full_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CHUNK_SIZE", "0")
 
     with pytest.raises(ValidationError):
         Settings()

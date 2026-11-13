@@ -6,7 +6,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Typed application settings for the helpdesk RAG chatbot.
+    """
+    Typed application settings for the helpdesk RAG chatbot.
 
     Values are read from environment variables, falling back to a `.env` file
     in the working directory. Missing required values raise a validation error
@@ -23,15 +24,21 @@ class Settings(BaseSettings):
             HISTORY_MAX_TOKENS: token budget for earlier turns sent to the model,
             counted approximately (optional, default 2000, must be > 0).
             LOG_LEVEL: logging level (optional, default INFO).
+            Chunking: SPLITTER, the splitter registry key (optional, default
+            "recursive"); CHUNK_SIZE, max chunk length in characters (optional,
+            default 800, must be > 0); CHUNK_OVERLAP, characters shared between
+            consecutive chunks (optional, default 100, must be >= 0).
 
     Secrets are `SecretStr`, so they are masked in `repr` and logs; call
     `.get_secret_value()` to read them.
     """
 
+    # LiteLLM configuration
     litellm_url: HttpUrl = Field(validation_alias="LITELLM_URL")
     litellm_key: SecretStr = Field(validation_alias="LITELLM_KEY")
     litellm_model: str = Field(validation_alias="LITELLM_MODEL")
 
+    # Langfuse configuration
     langfuse_public_key: SecretStr = Field(validation_alias="LANGFUSE_PUBLIC_KEY")
     langfuse_secret_key: SecretStr = Field(validation_alias="LANGFUSE_SECRET_KEY")
     langfuse_base_url: HttpUrl = Field(validation_alias="LANGFUSE_BASE_URL")
@@ -51,6 +58,12 @@ class Settings(BaseSettings):
         default=2000, gt=0, validation_alias="HISTORY_MAX_TOKENS"
     )
 
+    # Split configuration
+    splitter: str = Field(default="recursive", validation_alias="SPLITTER")
+    chunk_size: int = Field(default=800, gt=0, validation_alias="CHUNK_SIZE")
+    chunk_overlap: int = Field(default=100, ge=0, validation_alias="CHUNK_OVERLAP")
+
+    # Log configuration
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
         default="INFO", validation_alias="LOG_LEVEL"
     )
@@ -64,6 +77,7 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """
     Return the cached application settings instance.
+
     :return: The cached Settings instance.
     """
     return Settings()
