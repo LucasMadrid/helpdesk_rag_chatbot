@@ -16,6 +16,7 @@ REQUIRED_ENV = {
     "LANGFUSE_SECRET_KEY": "sk-lf-test",
     "LANGFUSE_BASE_URL": "http://localhost:3000",
     "APP_DB_URL": "postgresql://user:pw@localhost:5432/app",
+    "PINECONE_API_KEY": "pc-test",
 }
 OPTIONAL_ENV = [
     "LLM_TIMEOUT",
@@ -23,6 +24,9 @@ OPTIONAL_ENV = [
     "SPLITTER",
     "CHUNK_SIZE",
     "CHUNK_OVERLAP",
+    "PINECONE_INDEX",
+    "EMBEDDING_MODEL",
+    "EMBEDDING_DIMENSIONS",
 ]
 
 
@@ -93,6 +97,14 @@ def test_splitter_settings_defaults(full_env: dict[str, str]) -> None:
     assert settings.splitter == "recursive"
     assert settings.chunk_size == 800
     assert settings.chunk_overlap == 100
+
+
+def test_embedding_settings_defaults(full_env: dict[str, str]) -> None:
+    settings = Settings()
+
+    assert settings.pinecone_index == "helpdesk-docs"
+    assert settings.embedding_model == "text-embedding-3-small"
+    assert settings.embedding_dimensions == 1536
 
 
 def test_chunk_size_must_be_positive(
