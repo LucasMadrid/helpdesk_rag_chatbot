@@ -28,6 +28,10 @@ class Settings(BaseSettings):
             "recursive"); CHUNK_SIZE, max chunk length in characters (optional,
             default 800, must be > 0); CHUNK_OVERLAP, characters shared between
             consecutive chunks (optional, default 100, must be >= 0).
+            Vectorstore: PINECONE_API_KEY; PINECONE_INDEX, the index name
+            (optional, default "helpdesk-corpus"); EMBEDDING_MODEL (optional,
+            default "text-embedding-3-small"); EMBEDDING_DIMENSIONS, vector
+            size, which must match the index (optional, default 1536, must be > 0).
 
     Secrets are `SecretStr`, so they are masked in `repr` and logs; call
     `.get_secret_value()` to read them.
@@ -62,6 +66,18 @@ class Settings(BaseSettings):
     splitter: str = Field(default="recursive", validation_alias="SPLITTER")
     chunk_size: int = Field(default=800, gt=0, validation_alias="CHUNK_SIZE")
     chunk_overlap: int = Field(default=100, ge=0, validation_alias="CHUNK_OVERLAP")
+
+    # Vectorstore
+    pinecone_api_key: SecretStr = Field(validation_alias="PINECONE_API_KEY")
+    pinecone_index: str = Field(
+        default="helpdesk-corpus", validation_alias="PINECONE_INDEX"
+    )
+    embedding_model: str = Field(
+        default="text-embedding-3-small", validation_alias="EMBEDDING_MODEL"
+    )
+    embedding_dimensions: int = Field(
+        default=1536, gt=0, validation_alias="EMBEDDING_DIMENSIONS"
+    )
 
     # Log configuration
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(

@@ -32,6 +32,7 @@ REQUIRED_SETTINGS: dict[str, object] = {
     "LANGFUSE_SECRET_KEY": "sk-lf-test",
     "LANGFUSE_BASE_URL": "http://localhost:3000",
     "APP_DB_URL": "postgresql://user:pw@localhost:5432/app",
+    "PINECONE_API_KEY": "pc-test",
 }
 
 SettingsFactory = Callable[..., Settings]
