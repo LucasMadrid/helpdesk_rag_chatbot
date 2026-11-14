@@ -20,6 +20,10 @@ uv run pytest             # run the tests
 
 The Langfuse UI opens at http://localhost:3000.
 
+The corpus index lives in [Pinecone](https://www.pinecone.io/) (free Starter
+plan is enough). Put your key in `.env` as `PINECONE_API_KEY`; `uv run pytest`
+never calls Pinecone, so the tests run without it being reachable.
+
 To stop the stack, run `docker compose down`. Don't add `-v` unless you want to
 delete **all** data, including `app-db` (see [ADR 0001](docs/adr/0001-separate-app-database.md)).
 
@@ -207,7 +211,7 @@ are in `evals/seed_questions.md`.
 ### Loading the corpus
 
 `helpdesk_rag_chatbot.ingestion` turns the corpus into LangChain `Document`s,
-one per file. Nothing is split or embedded yet.
+one per file.
 
 ```bash
 uv run python -c "from pathlib import Path; from helpdesk_rag_chatbot.ingestion.loaders import load_corpus; print(len(load_corpus(Path('data/docs'))))"
@@ -221,3 +225,32 @@ uv run python -c "from pathlib import Path; from helpdesk_rag_chatbot.ingestion.
   stripped lines, at most one blank line in a row.
 - `Document.id` is `{doc_id}@{version}`. The metadata is the front matter or
   sidecar (without `file`) plus `source` (the file name) and `file_type`.
+
+### Splitting and indexing
+
+`chunk_documents` (in `helpdesk_rag_chatbot.splitters`) splits the documents
+with the splitter named in `SPLITTER` (default `recursive`), using `CHUNK_SIZE`
+(default `800` characters) and `CHUNK_OVERLAP` (default `100`). With the
+defaults the corpus gives 150 chunks. Each chunk keeps its parent's metadata
+plus `parent_id`, `chunk_index`, `splitter` and `start_index`.
+
+`helpdesk_rag_chatbot.adapters.vectorstore` embeds the chunks through the
+LiteLLM gateway and upserts them into one Pinecone index, in a namespace named
+after the splitter, so each splitter's chunks stay separate (see
+[ADR 0009](docs/adr/0009-vector-store.md)).
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `PINECONE_API_KEY` | required | key of your Pinecone project |
+| `PINECONE_INDEX` | `helpdesk-corpus` | index name; created on first use (cosine, AWS `us-east-1`) |
+| `EMBEDDING_MODEL` | `text-embedding-3-small` | embedding model name on the gateway |
+| `EMBEDDING_DIMENSIONS` | `1536` | vector size; must match the model |
+
+- Each vector ID is `{parent_id}#{chunk_index}#{hash}`, where the hash comes
+  from the chunk's text. Indexing the same chunks again overwrites them, so the
+  count stays at 150.
+- The index's dimension is fixed when it is created. If you change
+  `EMBEDDING_MODEL` to one with another size, delete the index in the Pinecone
+  console first.
+- The code only uses LangChain's `VectorStore` interface, so the tests use an
+  in-memory store and never call Pinecone or the gateway.
