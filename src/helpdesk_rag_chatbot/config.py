@@ -29,7 +29,7 @@ class Settings(BaseSettings):
             default 800, must be > 0); CHUNK_OVERLAP, characters shared between
             consecutive chunks (optional, default 100, must be >= 0).
             Vectorstore: PINECONE_API_KEY; PINECONE_INDEX, the index name
-            (optional, default "helpdesk-docs"); EMBEDDING_MODEL (optional,
+            (optional, default "helpdesk-corpus"); EMBEDDING_MODEL (optional,
             default "text-embedding-3-small"); EMBEDDING_DIMENSIONS, vector
             size, which must match the index (optional, default 1536, must be > 0).
 
@@ -70,7 +70,7 @@ class Settings(BaseSettings):
     # Vectorstore
     pinecone_api_key: SecretStr = Field(validation_alias="PINECONE_API_KEY")
     pinecone_index: str = Field(
-        default="helpdesk-docs", validation_alias="PINECONE_INDEX"
+        default="helpdesk-corpus", validation_alias="PINECONE_INDEX"
     )
     embedding_model: str = Field(
         default="text-embedding-3-small", validation_alias="EMBEDDING_MODEL"

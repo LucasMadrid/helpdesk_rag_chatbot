@@ -102,7 +102,7 @@ def test_splitter_settings_defaults(full_env: dict[str, str]) -> None:
 def test_embedding_settings_defaults(full_env: dict[str, str]) -> None:
     settings = Settings()
 
-    assert settings.pinecone_index == "helpdesk-docs"
+    assert settings.pinecone_index == "helpdesk-corpus"
     assert settings.embedding_model == "text-embedding-3-small"
     assert settings.embedding_dimensions == 1536
 
