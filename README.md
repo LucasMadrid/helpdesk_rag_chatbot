@@ -242,7 +242,7 @@ after the splitter, so each splitter's chunks stay separate (see
 | Setting | Default | Meaning |
 |---|---|---|
 | `PINECONE_API_KEY` | required | key of your Pinecone project |
-| `PINECONE_INDEX` | `helpdesk-corpus` | index name; created on first use (cosine, AWS `us-east-1`) |
+| `PINECONE_INDEX` | `helpdesk-corpus` | index name; `ensure_index` creates it if missing (cosine, AWS `us-east-1`) |
 | `EMBEDDING_MODEL` | `text-embedding-3-small` | embedding model name on the gateway |
 | `EMBEDDING_DIMENSIONS` | `1536` | vector size; must match the model |
 

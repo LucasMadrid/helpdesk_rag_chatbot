@@ -58,6 +58,15 @@ def test_chunk_id_changes_when_content_changes() -> None:
     )
 
 
+def test_chunk_ids_unique_across_corpus(corpus_chunks: list[Document]) -> None:
+    ids = [chunk_id(c) for c in corpus_chunks]
+
+    assert len(ids) == 150
+    assert len(set(ids)) == 150
+    # Pinecone record IDs must be ASCII and at most 512 characters.
+    assert all(i.isascii() and len(i) <= 512 for i in ids)
+
+
 def test_index_chunks_twice_does_not_duplicate(
     store: InMemoryVectorStore, corpus_chunks: list[Document]
 ) -> None:

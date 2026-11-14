@@ -1,6 +1,6 @@
 """Embedding model client, served through the LiteLLM gateway."""
 
-from langchain.embeddings import Embeddings
+from langchain_core.embeddings import Embeddings
 from langchain_openai.embeddings import OpenAIEmbeddings
 
 from helpdesk_rag_chatbot.config import Settings

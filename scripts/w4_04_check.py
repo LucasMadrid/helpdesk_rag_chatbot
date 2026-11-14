@@ -1,4 +1,5 @@
-# Save as ~/w4_04_check.py, then from the repo root: uv run python ~/w4_04_check.py
+# Manual W4-04 check against real Pinecone. From the repo root:
+#   uv run python scripts/w4_04_check.py
 import time
 from pathlib import Path
 

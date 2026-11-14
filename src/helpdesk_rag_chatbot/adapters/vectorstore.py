@@ -1,7 +1,9 @@
+"""Pinecone vector store: index creation, the store client and chunk upserts."""
+
 from hashlib import sha256
 
-from langchain.embeddings import Embeddings
 from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
 from langchain_core.vectorstores import VectorStore
 from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone, ServerlessSpec
