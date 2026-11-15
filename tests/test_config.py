@@ -27,6 +27,7 @@ OPTIONAL_ENV = [
     "PINECONE_INDEX",
     "EMBEDDING_MODEL",
     "EMBEDDING_DIMENSIONS",
+    "RETRIEVAL_K",
 ]
 
 
@@ -105,6 +106,19 @@ def test_embedding_settings_defaults(full_env: dict[str, str]) -> None:
     assert settings.pinecone_index == "helpdesk-corpus"
     assert settings.embedding_model == "text-embedding-3-small"
     assert settings.embedding_dimensions == 1536
+
+
+def test_retrieval_k_defaults_to_4(full_env: dict[str, str]) -> None:
+    assert Settings().retrieval_k == 4
+
+
+def test_retrieval_k_of_zero_is_rejected(
+    full_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("RETRIEVAL_K", "0")
+
+    with pytest.raises(ValidationError):
+        Settings()
 
 
 def test_chunk_size_must_be_positive(

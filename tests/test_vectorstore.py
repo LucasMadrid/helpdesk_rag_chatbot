@@ -10,9 +10,11 @@ from langchain_core.embeddings import DeterministicFakeEmbedding
 from langchain_core.vectorstores import InMemoryVectorStore
 
 from helpdesk_rag_chatbot.adapters.vectorstore import (
+    CURRENT_ONLY_FILTER,
     chunk_id,
     clear_namespace,
     ensure_index,
+    get_retriever,
     index_chunks,
 )
 from helpdesk_rag_chatbot.ingestion.loaders import load_corpus
@@ -144,3 +146,59 @@ def test_clear_namespace_skips_missing() -> None:
     assert cleared == 0
     [index] = client.opened
     assert index.deleted == []
+
+
+def _current_only(doc: Document) -> bool:
+    """In-memory twin of ``CURRENT_ONLY_FILTER``, which only Pinecone reads."""
+    return doc.metadata["status"] == "current"
+
+
+def test_get_retriever_passes_k_and_filter(store: InMemoryVectorStore) -> None:
+    retriever = get_retriever(store, 4, CURRENT_ONLY_FILTER)
+
+    assert retriever.search_kwargs == {
+        "k": 4,
+        "filter": {"status": {"$eq": "current"}},
+    }
+
+
+def test_retriever_drops_superseded_twin(store: InMemoryVectorStore) -> None:
+    text = "Remote work needs manager approval."
+    twins = [
+        Document(
+            page_content=text,
+            metadata={
+                "parent_id": f"hr-remote-work-policy@{version}",
+                "chunk_index": 0,
+                "status": status,
+                "version": version,
+            },
+        )
+        for version, status in [("1.0", "superseded"), ("2.0", "current")]
+    ]
+    index_chunks(store, twins)
+
+    docs = get_retriever(store, 4, _current_only).invoke(text)
+
+    assert [d.metadata["version"] for d in docs] == ["2.0"]
+
+
+def test_retriever_returns_at_most_k(
+    store: InMemoryVectorStore, corpus_chunks: list[Document]
+) -> None:
+    index_chunks(store, corpus_chunks)
+
+    docs = get_retriever(store, 3, _current_only).invoke("How do I reset my password?")
+
+    assert len(docs) == 3
+
+
+def test_retriever_on_corpus_has_no_superseded(
+    store: InMemoryVectorStore, corpus_chunks: list[Document]
+) -> None:
+    index_chunks(store, corpus_chunks)
+
+    docs = get_retriever(store, 150, _current_only).invoke("remote work policy")
+
+    assert len(docs) == 136
+    assert all(d.metadata["status"] == "current" for d in docs)

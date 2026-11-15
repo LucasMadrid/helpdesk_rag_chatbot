@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     embedding_dimensions: int = Field(
         default=1536, gt=0, validation_alias="EMBEDDING_DIMENSIONS"
     )
+    retrieval_k: int = Field(default=4, gt=0, validation_alias="RETRIEVAL_K")
 
     # Log configuration
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
