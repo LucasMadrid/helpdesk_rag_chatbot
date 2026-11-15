@@ -32,6 +32,8 @@ class Settings(BaseSettings):
             (optional, default "helpdesk-corpus"); EMBEDDING_MODEL (optional,
             default "text-embedding-3-small"); EMBEDDING_DIMENSIONS, vector
             size, which must match the index (optional, default 1536, must be > 0).
+            Retrieval: RETRIEVAL_K, chunks returned per query (optional,
+            default 4, must be > 0).
 
     Secrets are `SecretStr`, so they are masked in `repr` and logs; call
     `.get_secret_value()` to read them.
