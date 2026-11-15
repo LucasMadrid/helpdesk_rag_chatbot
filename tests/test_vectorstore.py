@@ -2,16 +2,16 @@
 
 from hashlib import sha256
 from pathlib import Path
-from types import SimpleNamespace
-from typing import Any
 
 import pytest
+from fakes import FakePineconeClient
 from langchain_core.documents import Document
 from langchain_core.embeddings import DeterministicFakeEmbedding
 from langchain_core.vectorstores import InMemoryVectorStore
 
 from helpdesk_rag_chatbot.adapters.vectorstore import (
     chunk_id,
+    clear_namespace,
     ensure_index,
     index_chunks,
 )
@@ -96,24 +96,6 @@ def test_index_chunks_with_no_chunks_returns_empty(
     assert store.store == {}
 
 
-class FakePineconeClient:
-    """Stands in for ``pinecone.Pinecone``; holds index dimensions by name."""
-
-    def __init__(self, indexes: dict[str, int] | None = None) -> None:
-        self.indexes = dict(indexes or {})
-        self.created: list[dict[str, Any]] = []
-
-    def has_index(self, name: str) -> bool:
-        return name in self.indexes
-
-    def describe_index(self, name: str) -> SimpleNamespace:
-        return SimpleNamespace(dimension=self.indexes[name])
-
-    def create_index(self, **kwargs: Any) -> None:
-        self.created.append(kwargs)
-        self.indexes[kwargs["name"]] = kwargs["dimension"]
-
-
 def test_ensure_index_creates_missing_index() -> None:
     client = FakePineconeClient()
 
@@ -141,3 +123,24 @@ def test_ensure_index_rejects_dimension_mismatch() -> None:
         ensure_index(client, "helpdesk-corpus", 1536)  # type: ignore[arg-type]
 
     assert client.created == []
+
+
+def test_clear_namespace_deletes_existing() -> None:
+    client = FakePineconeClient(namespaces={"recursive": 150, "markdown": 90})
+
+    cleared = clear_namespace(client, "helpdesk-corpus", "recursive")  # type: ignore[arg-type]
+
+    assert cleared == 150
+    [index] = client.opened
+    assert index.name == "helpdesk-corpus"
+    assert index.deleted == [{"delete_all": True, "namespace": "recursive"}]
+
+
+def test_clear_namespace_skips_missing() -> None:
+    client = FakePineconeClient(namespaces={"markdown": 90})
+
+    cleared = clear_namespace(client, "helpdesk-corpus", "recursive")  # type: ignore[arg-type]
+
+    assert cleared == 0
+    [index] = client.opened
+    assert index.deleted == []
