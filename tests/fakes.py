@@ -2,6 +2,8 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from types import SimpleNamespace
+from typing import Any
 from uuid import UUID
 
 from langchain_core.callbacks import BaseCallbackHandler
@@ -64,3 +66,52 @@ class PromptSpy(BaseCallbackHandler):
 
     def on_chat_model_start(self, serialized, messages, **kwargs):
         self.prompts.append(messages[0])
+
+
+class FakeIndex:
+    """Stands in for ``pinecone.Index``; holds vector counts by namespace."""
+
+    def __init__(self, name: str, namespaces: dict[str, int]) -> None:
+        self.name = name
+        self.namespaces = namespaces
+        self.deleted: list[dict[str, Any]] = []
+
+    def describe_index_stats(self) -> SimpleNamespace:
+        return SimpleNamespace(
+            namespaces={
+                ns: SimpleNamespace(vector_count=count)
+                for ns, count in self.namespaces.items()
+            }
+        )
+
+    def delete(self, **kwargs: Any) -> None:
+        self.deleted.append(kwargs)
+
+
+class FakePineconeClient:
+    """Stands in for ``pinecone.Pinecone``; holds index dimensions by name."""
+
+    def __init__(
+        self,
+        indexes: dict[str, int] | None = None,
+        namespaces: dict[str, int] | None = None,
+    ) -> None:
+        self.indexes = dict(indexes or {})
+        self.created: list[dict[str, Any]] = []
+        self.namespaces = dict(namespaces or {})
+        self.opened: list[FakeIndex] = []
+
+    def Index(self, name: str) -> FakeIndex:
+        index = FakeIndex(name, self.namespaces)
+        self.opened.append(index)
+        return index
+
+    def has_index(self, name: str) -> bool:
+        return name in self.indexes
+
+    def describe_index(self, name: str) -> SimpleNamespace:
+        return SimpleNamespace(dimension=self.indexes[name])
+
+    def create_index(self, **kwargs: Any) -> None:
+        self.created.append(kwargs)
+        self.indexes[kwargs["name"]] = kwargs["dimension"]

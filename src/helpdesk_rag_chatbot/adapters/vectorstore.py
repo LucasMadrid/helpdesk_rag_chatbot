@@ -119,3 +119,30 @@ def ensure_index(client: Pinecone, name: str, dimension: int) -> None:
             f"model produces {dimension}. Set EMBEDDING_DIMENSIONS to {existing} "
             "or use a new index."
         )
+
+
+def clear_namespace(client: Pinecone, index_name: str, namespace: str) -> int:
+    """
+    Delete every vector in one namespace of the index.
+
+    Safe to call when the namespace does not exist: nothing is deleted and 0 is
+    returned (serverless Pinecone would 404 on a delete in a missing namespace).
+    Other namespaces in the index are not touched.
+
+    The count comes from ``describe_index_stats``, which is eventually
+    consistent, so it may lag writes made just before the call.
+
+    :param client: A Pinecone SDK client (``pinecone.Pinecone``).
+    :param index_name: The index name, usually ``settings.pinecone_index``.
+    :param namespace: The namespace to empty.
+    :return: The number of vectors the namespace held before the delete.
+    """
+
+    index = client.Index(name=index_name)
+    summary = index.describe_index_stats().namespaces.get(namespace)
+
+    if summary is None or summary.vector_count == 0:
+        return 0
+
+    index.delete(delete_all=True, namespace=namespace)
+    return summary.vector_count

@@ -254,3 +254,26 @@ after the splitter, so each splitter's chunks stay separate (see
   console first.
 - The code only uses LangChain's `VectorStore` interface, so the tests use an
   in-memory store and never call Pinecone or the gateway.
+
+### Ingest the corpus
+
+One command loads `data/docs`, splits it, empties the splitter's namespace and
+indexes the new chunks. It needs `.env` with `PINECONE_API_KEY` and a reachable
+LiteLLM gateway, and creates the index if it is missing.
+
+```bash
+uv run python -m helpdesk_rag_chatbot.ingest
+# {"logger": "helpdesk_rag_chatbot.ingest", ..., "message": "ingest done",
+#  "splitter": "recursive", "documents": 17, "chunks": 150, "deleted": 0, "indexed": 150}
+```
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--splitter` | `SPLITTER` | splitter to use, which is also the namespace rebuilt |
+| `--chunk-size` | `CHUNK_SIZE` | maximum chunk length in characters |
+| `--chunk-overlap` | `CHUNK_OVERLAP` | characters shared between neighbouring chunks |
+
+A flag overrides the matching setting for this run only. Other splitters'
+namespaces are not touched, and running again with the same settings gives
+the same vectors. The counts are logged as one JSON line, like the API's logs,
+so scripts can parse them.
