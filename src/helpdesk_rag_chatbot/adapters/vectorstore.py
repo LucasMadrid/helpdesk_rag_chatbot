@@ -1,14 +1,18 @@
 """Pinecone vector store: index creation, the store client and chunk upserts."""
 
+from collections.abc import Callable
 from hashlib import sha256
+from typing import Any
 
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
-from langchain_core.vectorstores import VectorStore
+from langchain_core.vectorstores import VectorStore, VectorStoreRetriever
 from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone, ServerlessSpec
 
 from helpdesk_rag_chatbot.config import Settings
+
+CURRENT_ONLY_FILTER: dict[str, Any] = {"status": {"$eq": "current"}}
 
 
 def chunk_id(chunk: Document) -> str:
@@ -146,3 +150,32 @@ def clear_namespace(client: Pinecone, index_name: str, namespace: str) -> int:
 
     index.delete(delete_all=True, namespace=namespace)
     return summary.vector_count
+
+
+def get_retriever(
+    store: VectorStore,
+    k: int,
+    search_filter: dict[str, Any] | Callable[[Document], bool],
+) -> VectorStoreRetriever:
+    """
+    Build a retriever that returns the ``k`` chunks most similar to a query.
+
+    Search is plain similarity (no MMR or score threshold), and only chunks that
+    match ``search_filter`` are considered. The retriever only searches the
+    namespace ``store`` is bound to, so build one per splitter.
+
+    :param store: The vector store to search, e.g. from ``get_vector_store``.
+    :param k: The maximum number of chunks to return per query.
+    :param search_filter: Which chunks may be returned. The format depends on
+        the store: a Pinecone metadata filter for ``PineconeVectorStore``, e.g.
+        ``{"status": {"$eq": "current"}}``, or a ``Document -> bool`` function
+        for ``InMemoryVectorStore``.
+    :return: A ``VectorStoreRetriever``; call ``invoke(query)`` to get a list of
+        ``Document``, most similar first.
+    """
+
+    # The filter must go inside search_kwargs: as_retriever drops a top-level
+    # filter= without an error, and then superseded chunks come back.
+    return store.as_retriever(
+        search_type="similarity", search_kwargs={"k": k, "filter": search_filter}
+    )

@@ -277,3 +277,14 @@ A flag overrides the matching setting for this run only. Other splitters'
 namespaces are not touched, and running again with the same settings gives
 the same vectors. The counts are logged as one JSON line, like the API's logs,
 so scripts can parse them.
+
+### Retrieval
+
+`get_retriever` (in `helpdesk_rag_chatbot.adapters.vectorstore`) returns the
+chunks most similar to a question, from the splitter's namespace. It only
+returns chunks whose `status` is `current` (`CURRENT_ONLY_FILTER`), so a
+superseded version never reaches the answer.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `RETRIEVAL_K` | `4` | chunks returned per question; must be > 0 |
