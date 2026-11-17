@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 
 from langchain.messages import SystemMessage
@@ -79,3 +80,43 @@ def fit_docs(docs: list[Document], max_tokens: int) -> list[Document]:
         kept.append(doc)
 
     return kept
+
+
+def cited_sources(answer: str, docs: list[Document]) -> list[Source]:
+    """
+    List the documents an answer cites with ``[n]`` markers.
+
+    ``[n]`` refers to the n-th chunk of ``docs``, numbered from 1 as in
+    ``format_context``. Numbers outside ``1..len(docs)`` (``[0]`` included) are
+    skipped. Several chunks of one document, or one number cited more than
+    once, give a single source, identified by ``doc_id`` and ``version``.
+
+    :param answer: The model's answer text.
+    :param docs: The chunks sent as context, in the order they were numbered.
+    :return: The cited sources in order of first mention; empty if the answer
+        cites nothing valid.
+    :raises KeyError: If a cited chunk's metadata lacks ``doc_id``, ``title``
+        or ``version``.
+    """
+    sources: list[Source] = []
+    seen: set[tuple[str, str]] = set()
+
+    for number in re.findall(r"\[(\d+)\]", answer):
+        n = int(number)
+
+        if not 1 <= n <= len(docs):
+            continue
+
+        meta = docs[n - 1].metadata
+
+        key = (meta["doc_id"], meta["version"])
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+        sources.append(
+            Source(doc_id=meta["doc_id"], title=meta["title"], version=meta["version"])
+        )
+
+    return sources
