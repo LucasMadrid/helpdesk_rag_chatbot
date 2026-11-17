@@ -92,6 +92,9 @@ class SourceOut(BaseModel):
     version: str = Field(
         description="The version of the document the answer used, e.g. 2.0."
     )
+    numbers: list[int] = Field(
+        description="The [n] markers in the answer that point to this document, ascending, e.g. [1, 3]. They only mean something for this one answer."
+    )
 
 
 class ChatResponse(BaseModel):
@@ -151,7 +154,12 @@ async def chat(
         request_id=UUID(request_id),
         answer=reply.answer,
         sources=[
-            SourceOut(doc_id=s.doc_id, title=s.title, version=s.version)
+            SourceOut(
+                doc_id=s.doc_id,
+                title=s.title,
+                version=s.version,
+                numbers=list(s.numbers),
+            )
             for s in reply.sources
         ],
     )

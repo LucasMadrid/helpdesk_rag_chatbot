@@ -80,8 +80,18 @@ def test_chat_returns_sources(make_client: ClientFactory) -> None:
     reply.return_value = ChatReply(
         answer="Reset it from the portal [1], then sign in [2].",
         sources=[
-            Source(doc_id="it-password-reset", title="Password Reset", version="2.0"),
-            Source(doc_id="it-sso-login", title="Single Sign-On", version="1.1"),
+            Source(
+                doc_id="it-password-reset",
+                title="Password Reset",
+                version="2.0",
+                numbers=(1,),
+            ),
+            Source(
+                doc_id="it-sso-login",
+                title="Single Sign-On",
+                version="1.1",
+                numbers=(2,),
+            ),
         ],
     )
 
@@ -91,8 +101,18 @@ def test_chat_returns_sources(make_client: ClientFactory) -> None:
     data = response.json()
     assert data["answer"] == "Reset it from the portal [1], then sign in [2]."
     assert data["sources"] == [
-        {"doc_id": "it-password-reset", "title": "Password Reset", "version": "2.0"},
-        {"doc_id": "it-sso-login", "title": "Single Sign-On", "version": "1.1"},
+        {
+            "doc_id": "it-password-reset",
+            "title": "Password Reset",
+            "version": "2.0",
+            "numbers": [1],
+        },
+        {
+            "doc_id": "it-sso-login",
+            "title": "Single Sign-On",
+            "version": "1.1",
+            "numbers": [2],
+        },
     ]
 
 

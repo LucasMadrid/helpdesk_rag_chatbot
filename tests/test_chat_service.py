@@ -192,7 +192,12 @@ def test_reply_returns_the_sources_the_answer_cites():
 
     assert reply.answer == "Use the portal [1]."
     assert reply.sources == [
-        Source(doc_id="it-password-reset", title="Password Reset", version="2.0")
+        Source(
+            doc_id="it-password-reset",
+            title="Password Reset",
+            version="2.0",
+            numbers=(1,),
+        )
     ]
 
 

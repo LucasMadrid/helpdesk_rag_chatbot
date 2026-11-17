@@ -14,11 +14,15 @@ class Source:
     :ivar doc_id: The document's stable id, e.g. ``hr-remote-work-policy``.
     :ivar title: The document's human-readable title.
     :ivar version: The document's version, e.g. ``2.0``.
+    :ivar numbers: The ``[n]`` markers in the answer that point to this
+        document, ascending. Several when the answer cites more than one of
+        its chunks. The numbers only mean something for this one answer.
     """
 
     doc_id: str
     title: str
     version: str
+    numbers: tuple[int, ...]
 
 
 def format_context(docs: list[Document]) -> str:
@@ -89,7 +93,9 @@ def cited_sources(answer: str, docs: list[Document]) -> list[Source]:
     ``[n]`` refers to the n-th chunk of ``docs``, numbered from 1 as in
     ``format_context``. Numbers outside ``1..len(docs)`` (``[0]`` included) are
     skipped. Several chunks of one document, or one number cited more than
-    once, give a single source, identified by ``doc_id`` and ``version``.
+    once, give a single source, identified by ``doc_id`` and ``version``. Its
+    ``numbers`` keep every valid ``[n]`` that points to it, so a client can
+    link each marker in the text to its source.
 
     :param answer: The model's answer text.
     :param docs: The chunks sent as context, in the order they were numbered.
@@ -98,8 +104,9 @@ def cited_sources(answer: str, docs: list[Document]) -> list[Source]:
     :raises KeyError: If a cited chunk's metadata lacks ``doc_id``, ``title``
         or ``version``.
     """
-    sources: list[Source] = []
-    seen: set[tuple[str, str]] = set()
+    # One entry per document. Dicts keep insertion order, so the first
+    # mention decides the order of the sources.
+    cited: dict[tuple[str, str], tuple[dict, set[int]]] = {}
 
     for number in re.findall(r"\[(\d+)\]", answer):
         n = int(number)
@@ -111,12 +118,17 @@ def cited_sources(answer: str, docs: list[Document]) -> list[Source]:
 
         key = (meta["doc_id"], meta["version"])
 
-        if key in seen:
-            continue
+        if key not in cited:
+            cited[key] = (meta, set())
 
-        seen.add(key)
-        sources.append(
-            Source(doc_id=meta["doc_id"], title=meta["title"], version=meta["version"])
+        cited[key][1].add(n)
+
+    return [
+        Source(
+            doc_id=meta["doc_id"],
+            title=meta["title"],
+            version=meta["version"],
+            numbers=tuple(sorted(numbers)),
         )
-
-    return sources
+        for meta, numbers in cited.values()
+    ]

@@ -56,9 +56,14 @@ def test_fit_docs_returns_empty_when_first_chunk_is_too_big() -> None:
     assert fit_docs([too_big, small], budget) == []
 
 
-def as_source(doc: Document) -> Source:
+def as_source(doc: Document, *numbers: int) -> Source:
     meta = doc.metadata
-    return Source(doc_id=meta["doc_id"], title=meta["title"], version=meta["version"])
+    return Source(
+        doc_id=meta["doc_id"],
+        title=meta["title"],
+        version=meta["version"],
+        numbers=numbers,
+    )
 
 
 def test_cited_sources_maps_one_based_numbers_to_chunks() -> None:
@@ -66,7 +71,7 @@ def test_cited_sources_maps_one_based_numbers_to_chunks() -> None:
 
     sources = cited_sources("See [3] and [1].", docs)
 
-    assert sources == [as_source(docs[2]), as_source(docs[0])]
+    assert sources == [as_source(docs[2], 3), as_source(docs[0], 1)]
 
 
 def test_cited_sources_skips_out_of_range_numbers() -> None:
@@ -75,7 +80,7 @@ def test_cited_sources_skips_out_of_range_numbers() -> None:
     # [0] must not wrap around to docs[-1] ("c"), which nothing else cites.
     sources = cited_sources("See [0], [1] and [9].", docs)
 
-    assert sources == [as_source(docs[0])]
+    assert sources == [as_source(docs[0], 1)]
 
 
 def test_cited_sources_lists_each_document_once() -> None:
@@ -87,4 +92,15 @@ def test_cited_sources_lists_each_document_once() -> None:
         "See [1], [2], [3] and [1] again.", [first_chunk, second_chunk, other]
     )
 
-    assert sources == [as_source(first_chunk), as_source(other)]
+    assert sources == [as_source(first_chunk, 1, 2), as_source(other, 3)]
+
+
+def test_cited_sources_keeps_every_number_that_points_to_a_document() -> None:
+    # Beyond the contract: the UI uses numbers to link each [n] to its source.
+    first_chunk = make_doc("a", "part one")
+    second_chunk = make_doc("a", "part two")
+
+    [source] = cited_sources("Do this [2]. Then that [1].", [first_chunk, second_chunk])
+
+    assert source.doc_id == "a"
+    assert list(source.numbers) == [1, 2]  # ascending, not in order of mention
