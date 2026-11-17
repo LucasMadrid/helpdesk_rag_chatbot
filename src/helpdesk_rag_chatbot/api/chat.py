@@ -14,6 +14,7 @@ from helpdesk_rag_chatbot.api.dependencies import (
     SessionStoreDependency,
 )
 from helpdesk_rag_chatbot.services.chat import ImageAttachment
+from helpdesk_rag_chatbot.services.rag import Source
 
 logger = logging.getLogger(__name__)
 
@@ -85,12 +86,15 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    """Response body for ``POST /chat``: the generated answer and its request ID."""
+    """Response body for ``POST /chat``: the answer, its sources and request ID."""
 
     request_id: UUID7 = Field(
         description="The server-generated unique identifier (UUIDv7) of this request. It is also attached to traces, so the client can quote it when reporting a problem."
     )
     answer: str = Field(description="The generated response text from the chatbot.")
+    sources: list[Source] = Field(
+        description="The documents the answer cites, once each, in order of first mention. Empty if it cites none."
+    )
 
 
 router = APIRouter()
@@ -109,7 +113,7 @@ async def chat(
     :param body: The validated request containing the user, session, and message.
     :param request_id: The ID the request ID middleware assigned to this request.
     :param service: The service that generates a reply for the chat message.
-    :return: The generated answer and the request ID used to track this call.
+    :return: The answer, its cited sources and the request ID of this call.
     """
     logger.info(
         "chat request received",
@@ -124,7 +128,7 @@ async def chat(
     if body.image is not None:
         image = ImageAttachment(mime_type=body.image.media_type, data=body.image.data)
 
-    answer = await service.reply(
+    reply = await service.reply(
         body.message,
         request_id=request_id,
         user_id=str(body.user_id),
@@ -132,4 +136,6 @@ async def chat(
         history=history,
         image=image,
     )
-    return ChatResponse(request_id=UUID(request_id), answer=answer)
+    return ChatResponse(
+        request_id=UUID(request_id), answer=reply.answer, sources=reply.sources
+    )
