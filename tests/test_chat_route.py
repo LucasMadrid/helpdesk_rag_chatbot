@@ -11,7 +11,8 @@ from langchain_core.language_models import FakeListChatModel
 from helpdesk_rag_chatbot.api.chat import MAX_IMAGE_BYTES
 from helpdesk_rag_chatbot.api.dependencies import get_chat_service, get_session_store
 from helpdesk_rag_chatbot.main import create_app
-from helpdesk_rag_chatbot.services.chat import ChatService, ImageAttachment
+from helpdesk_rag_chatbot.services.chat import ChatReply, ChatService, ImageAttachment
+from helpdesk_rag_chatbot.services.rag import Source
 
 FAKE_ANSWER = "Reset it from the portal."
 
@@ -58,6 +59,7 @@ def test_chat_returns_answer_and_request_id(make_client: ClientFactory) -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["answer"] == FAKE_ANSWER
+    assert data["sources"] == []
     # The server generates the request_id: it must be a valid UUIDv7.
     assert UUID(data["request_id"]).version == 7
     reply.assert_awaited_once_with(
@@ -70,6 +72,28 @@ def test_chat_returns_answer_and_request_id(make_client: ClientFactory) -> None:
     )
     # The id given to the service (and traces) is the one returned to the client.
     assert reply.await_args.kwargs["request_id"] == data["request_id"]
+
+
+def test_chat_returns_sources(make_client: ClientFactory) -> None:
+    client, reply = make_client()
+    # return_value takes over from wraps: the route gets this reply as-is.
+    reply.return_value = ChatReply(
+        answer="Reset it from the portal [1], then sign in [2].",
+        sources=[
+            Source(doc_id="it-password-reset", title="Password Reset", version="2.0"),
+            Source(doc_id="it-sso-login", title="Single Sign-On", version="1.1"),
+        ],
+    )
+
+    response = client.post("/chat", json=_payload())
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["answer"] == "Reset it from the portal [1], then sign in [2]."
+    assert data["sources"] == [
+        {"doc_id": "it-password-reset", "title": "Password Reset", "version": "2.0"},
+        {"doc_id": "it-sso-login", "title": "Single Sign-On", "version": "1.1"},
+    ]
 
 
 @pytest.mark.parametrize(
