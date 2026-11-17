@@ -27,9 +27,13 @@ def test_format_context_numbers_chunks_in_order() -> None:
     context = format_context(docs)
 
     assert context == (
-        "[1] Title vpn-setup vpn-setup v1.0\nInstall the VPN client.\n\n"
-        "[2] Title printer printer v1.0\nRestart the printer."
+        "[1] Title vpn-setup (vpn-setup v1.0)\nInstall the VPN client.\n\n"
+        "[2] Title printer (printer v1.0)\nRestart the printer."
     )
+
+
+def test_format_context_returns_empty_string_for_no_docs() -> None:
+    assert format_context([]) == ""
 
 
 def test_fit_docs_keeps_top_ranked_chunks_that_fit() -> None:

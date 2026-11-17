@@ -1,8 +1,8 @@
 import re
 from dataclasses import dataclass
 
-from langchain.messages import SystemMessage
 from langchain_core.documents import Document
+from langchain_core.messages import SystemMessage
 from langchain_core.messages.utils import count_tokens_approximately
 
 
@@ -25,7 +25,7 @@ def format_context(docs: list[Document]) -> str:
     """
     Render retrieved chunks as numbered context blocks for the prompt.
 
-    Each block is a header line ``[n] <title> <doc_id> v<version>`` followed
+    Each block is a header line ``[n] <title> (<doc_id> v<version>)`` followed
     by the chunk text. Numbers start at 1 and follow the order of ``docs``, so
     the model can cite a chunk as ``[n]``. Blocks are separated by a blank line.
 
@@ -37,7 +37,7 @@ def format_context(docs: list[Document]) -> str:
     blocks = []
     for index, doc in enumerate(docs, start=1):
         meta = doc.metadata
-        header = f"[{index}] {meta['title']} {meta['doc_id']} v{meta['version']}"
+        header = f"[{index}] {meta['title']} ({meta['doc_id']} v{meta['version']})"
 
         blocks.append(f"{header}\n{doc.page_content}")
 
