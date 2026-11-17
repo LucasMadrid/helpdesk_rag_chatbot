@@ -8,6 +8,7 @@ from langchain_core.documents import Document
 from langchain_core.language_models import FakeListChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.retrievers import BaseRetriever
+from pydantic import Field
 
 from helpdesk_rag_chatbot.services.chat import ChatService, ImageAttachment
 from helpdesk_rag_chatbot.services.prompts import HELPDESK_PROMPT
@@ -31,14 +32,16 @@ VPN_DOC = Document(
 )
 
 
-class StaticRetriever(BaseRetriever):
-    """Return the same chunks for every query."""
+class FakeRetriever(BaseRetriever):
+    """Return the same chunks for every query and record each query."""
 
     docs: list[Document]
+    queries: list[str] = Field(default_factory=list)
 
     def _get_relevant_documents(
         self, query: str, *, run_manager: CallbackManagerForRetrieverRun
     ) -> list[Document]:
+        self.queries.append(query)
         return self.docs
 
 
@@ -119,14 +122,14 @@ def test_reply_sends_run_name_and_ids_to_callbacks():
     )
 
 
-def test_reply_sends_retrieval_and_budget_numbers_to_callbacks():
+def test_reply_records_retrieval_in_trace_metadata():
     handler = RecordingHandler()
     used = context_tokens(format_context([PORTAL_DOC]))
     service = ChatService(
         FakeListChatModel(responses=["ok"]),
         callbacks=[handler],
         # VPN_DOC is retrieved but does not fit next to PORTAL_DOC.
-        retriever=StaticRetriever(docs=[PORTAL_DOC, VPN_DOC]),
+        retriever=FakeRetriever(docs=[PORTAL_DOC, VPN_DOC]),
         history_max_tokens=2000,
         context_max_tokens=used + 100,
     )
@@ -162,12 +165,12 @@ class PromptRecorder(BaseCallbackHandler):
         self.prompts.extend(m.content for batch in messages for m in batch)
 
 
-def test_reply_puts_context_into_the_prompt():
+def test_reply_puts_retrieved_chunks_into_the_prompt():
     recorder = PromptRecorder()
     service = ChatService(
         FakeListChatModel(responses=["ok"]),
         callbacks=[recorder],
-        retriever=StaticRetriever(docs=[PORTAL_DOC]),
+        retriever=FakeRetriever(docs=[PORTAL_DOC]),
     )
 
     asyncio.run(
@@ -183,7 +186,7 @@ def test_reply_puts_context_into_the_prompt():
 def test_reply_returns_the_sources_the_answer_cites():
     service = ChatService(
         FakeListChatModel(responses=["Use the portal [1]."]),
-        retriever=StaticRetriever(docs=[PORTAL_DOC]),
+        retriever=FakeRetriever(docs=[PORTAL_DOC]),
     )
 
     reply = asyncio.run(
@@ -201,12 +204,51 @@ def test_reply_returns_the_sources_the_answer_cites():
     ]
 
 
+def test_reply_searches_with_the_users_question():
+    retriever = FakeRetriever(docs=[PORTAL_DOC])
+    service = ChatService(FakeListChatModel(responses=["ok"]), retriever=retriever)
+
+    asyncio.run(
+        service.reply(
+            "How do I reset my password?", history=InMemoryChatMessageHistory(), **IDS
+        )
+    )
+
+    assert retriever.queries == ["How do I reset my password?"]
+
+
+def test_reply_returns_only_cited_sources():
+    sso_doc = Document(
+        page_content="Sign in with SSO.",
+        metadata={
+            "title": "Single Sign-On",
+            "doc_id": "it-sso-login",
+            "version": "1.1",
+        },
+    )
+    service = ChatService(
+        FakeListChatModel(responses=["Sign in with SSO [2]."]),
+        retriever=FakeRetriever(docs=[PORTAL_DOC, sso_doc, VPN_DOC]),
+    )
+
+    reply = asyncio.run(
+        service.reply("How do I sign in?", history=InMemoryChatMessageHistory(), **IDS)
+    )
+
+    # All 3 chunks were sent, but only chunk 2 is cited.
+    assert reply.sources == [
+        Source(
+            doc_id="it-sso-login", title="Single Sign-On", version="1.1", numbers=(2,)
+        )
+    ]
+
+
 def test_reply_drops_chunks_that_do_not_fit_the_context_budget():
     recorder = PromptRecorder()
     service = ChatService(
         FakeListChatModel(responses=["ok"]),
         callbacks=[recorder],
-        retriever=StaticRetriever(docs=[PORTAL_DOC, VPN_DOC]),
+        retriever=FakeRetriever(docs=[PORTAL_DOC, VPN_DOC]),
         # Room for the first chunk only.
         context_max_tokens=context_tokens(format_context([PORTAL_DOC])),
     )
@@ -223,7 +265,7 @@ def test_reply_drops_chunks_that_do_not_fit_the_context_budget():
 def test_reply_ignores_citations_of_chunks_that_were_not_sent():
     service = ChatService(
         FakeListChatModel(responses=["See [1] and [2]."]),
-        retriever=StaticRetriever(docs=[PORTAL_DOC, VPN_DOC]),
+        retriever=FakeRetriever(docs=[PORTAL_DOC, VPN_DOC]),
         context_max_tokens=context_tokens(format_context([PORTAL_DOC])),
     )
 
@@ -235,7 +277,7 @@ def test_reply_ignores_citations_of_chunks_that_were_not_sent():
     assert [s.doc_id for s in reply.sources] == ["it-password-reset"]
 
 
-def test_retrieved_chunks_leave_less_room_for_history():
+def test_reply_gives_history_only_the_budget_left_after_chunks():
     spy = PromptSpy()
     history = InMemoryChatMessageHistory()
     history.add_user_message("q1")
@@ -246,7 +288,7 @@ def test_retrieved_chunks_leave_less_room_for_history():
     service = ChatService(
         FakeListChatModel(responses=["a2"]),
         callbacks=[spy],
-        retriever=StaticRetriever(docs=[PORTAL_DOC]),
+        retriever=FakeRetriever(docs=[PORTAL_DOC]),
         history_max_tokens=2000,
         context_max_tokens=used + 1,
     )

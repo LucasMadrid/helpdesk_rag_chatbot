@@ -18,7 +18,7 @@ def make_doc(doc_id: str, text: str) -> Document:
     )
 
 
-def test_format_context_numbers_chunks_in_order() -> None:
+def test_format_context_numbers_chunks_with_title_and_version() -> None:
     docs = [
         make_doc("vpn-setup", "Install the VPN client."),
         make_doc("printer", "Restart the printer."),
@@ -37,6 +37,13 @@ def test_format_context_returns_empty_string_for_no_docs() -> None:
 
 
 def test_fit_docs_keeps_top_ranked_chunks_that_fit() -> None:
+    docs = [make_doc(name, f"text {name} " * 5) for name in ("a", "b", "c")]
+    budget = context_tokens(format_context(docs[:2]))
+
+    assert fit_docs(docs, budget) == docs[:2]
+
+
+def test_fit_docs_stops_at_the_first_chunk_that_does_not_fit() -> None:
     small_1 = make_doc("a", "short text " * 5)
     too_big = make_doc("b", "long text " * 200)
     small_3 = make_doc("c", "short text " * 5)
@@ -48,7 +55,7 @@ def test_fit_docs_keeps_top_ranked_chunks_that_fit() -> None:
     assert kept == [small_1]
 
 
-def test_fit_docs_returns_empty_when_first_chunk_is_too_big() -> None:
+def test_fit_docs_returns_nothing_when_the_first_chunk_is_too_big() -> None:
     too_big = make_doc("a", "long text " * 200)
     small = make_doc("b", "short text")
     budget = context_tokens(format_context([small])) * 2
@@ -66,7 +73,7 @@ def as_source(doc: Document, *numbers: int) -> Source:
     )
 
 
-def test_cited_sources_maps_one_based_numbers_to_chunks() -> None:
+def test_cited_sources_maps_markers_to_chunks() -> None:
     docs = [make_doc("a", "text a"), make_doc("b", "text b"), make_doc("c", "text c")]
 
     sources = cited_sources("See [3] and [1].", docs)
@@ -74,7 +81,7 @@ def test_cited_sources_maps_one_based_numbers_to_chunks() -> None:
     assert sources == [as_source(docs[2], 3), as_source(docs[0], 1)]
 
 
-def test_cited_sources_skips_out_of_range_numbers() -> None:
+def test_cited_sources_ignores_unknown_markers() -> None:
     docs = [make_doc("a", "text a"), make_doc("b", "text b"), make_doc("c", "text c")]
 
     # [0] must not wrap around to docs[-1] ("c"), which nothing else cites.
@@ -83,7 +90,7 @@ def test_cited_sources_skips_out_of_range_numbers() -> None:
     assert sources == [as_source(docs[0], 1)]
 
 
-def test_cited_sources_lists_each_document_once() -> None:
+def test_cited_sources_lists_each_doc_version_once() -> None:
     first_chunk = make_doc("a", "part one")
     second_chunk = make_doc("a", "part two")
     other = make_doc("b", "text b")
