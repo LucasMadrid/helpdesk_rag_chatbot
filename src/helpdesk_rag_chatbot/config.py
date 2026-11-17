@@ -33,7 +33,9 @@ class Settings(BaseSettings):
             default "text-embedding-3-small"); EMBEDDING_DIMENSIONS, vector
             size, which must match the index (optional, default 1536, must be > 0).
             Retrieval: RETRIEVAL_K, chunks returned per query (optional,
-            default 4, must be > 0).
+            default 4, must be > 0); CONTEXT_MAX_TOKENS, token budget for
+            retrieved chunks sent to the model, counted approximately
+            (optional, default 3000, must be > 0).
 
     Secrets are `SecretStr`, so they are masked in `repr` and logs; call
     `.get_secret_value()` to read them.
@@ -81,6 +83,9 @@ class Settings(BaseSettings):
         default=1536, gt=0, validation_alias="EMBEDDING_DIMENSIONS"
     )
     retrieval_k: int = Field(default=4, gt=0, validation_alias="RETRIEVAL_K")
+    context_max_tokens: int = Field(
+        default=3000, gt=0, validation_alias="CONTEXT_MAX_TOKENS"
+    )
 
     # Log configuration
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(

@@ -5,8 +5,10 @@ from collections.abc import Callable
 import pytest
 from fakes import FakePool
 from fastapi.testclient import TestClient
+from langchain_core.vectorstores import InMemoryVectorStore
 
 from helpdesk_rag_chatbot import main
+from helpdesk_rag_chatbot.adapters.vectorstore import CURRENT_ONLY_FILTER
 from helpdesk_rag_chatbot.config import Settings
 from helpdesk_rag_chatbot.main import create_app
 from helpdesk_rag_chatbot.services.chat import ChatService
@@ -15,7 +17,9 @@ SettingsFactory = Callable[..., Settings]
 
 
 def test_lifespan_builds_chat_service_on_startup(
-    make_settings: SettingsFactory, fake_pool: FakePool
+    make_settings: SettingsFactory,
+    fake_pool: FakePool,
+    fake_vector_store: InMemoryVectorStore,
 ) -> None:
     # `with` is what runs the lifespan; a bare TestClient(app) never starts it.
     with TestClient(create_app(make_settings())) as client:
@@ -24,7 +28,9 @@ def test_lifespan_builds_chat_service_on_startup(
 
 
 def test_lifespan_opens_pool_before_creating_table_and_closes_it(
-    make_settings: SettingsFactory, fake_pool: FakePool
+    make_settings: SettingsFactory,
+    fake_pool: FakePool,
+    fake_vector_store: InMemoryVectorStore,
 ) -> None:
     with TestClient(create_app(make_settings())):
         pass
@@ -42,6 +48,7 @@ def test_lifespan_closes_pool_even_if_shutdown_tracing_fails(
     monkeypatch: pytest.MonkeyPatch,
     make_settings: SettingsFactory,
     fake_pool: FakePool,
+    fake_vector_store: InMemoryVectorStore,
 ) -> None:
     def boom(settings: Settings) -> None:
         raise RuntimeError("boom")
@@ -59,3 +66,20 @@ def test_lifespan_closes_pool_even_if_shutdown_tracing_fails(
         pass
 
     assert "close" in fake_pool.events
+
+
+def test_lifespan_builds_retriever_with_current_only_filter(
+    make_settings: SettingsFactory,
+    fake_pool: FakePool,
+    fake_vector_store: InMemoryVectorStore,
+) -> None:
+    settings = make_settings(RETRIEVAL_K=6, CONTEXT_MAX_TOKENS=1500)
+
+    with TestClient(create_app(settings)) as client:
+        service = client.app.state.chat_service
+
+    retriever = service.retriever
+    assert retriever.vectorstore is fake_vector_store
+    # Superseded chunks stay in the index; the filter is what keeps them out.
+    assert retriever.search_kwargs == {"k": 6, "filter": CURRENT_ONLY_FILTER}
+    assert service.context_max_tokens == 1500

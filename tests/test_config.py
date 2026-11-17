@@ -28,6 +28,7 @@ OPTIONAL_ENV = [
     "EMBEDDING_MODEL",
     "EMBEDDING_DIMENSIONS",
     "RETRIEVAL_K",
+    "CONTEXT_MAX_TOKENS",
 ]
 
 
@@ -116,6 +117,19 @@ def test_retrieval_k_of_zero_is_rejected(
     full_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("RETRIEVAL_K", "0")
+
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_context_max_tokens_defaults_to_3000(full_env: dict[str, str]) -> None:
+    assert Settings().context_max_tokens == 3000
+
+
+def test_context_max_tokens_of_zero_is_rejected(
+    full_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CONTEXT_MAX_TOKENS", "0")
 
     with pytest.raises(ValidationError):
         Settings()

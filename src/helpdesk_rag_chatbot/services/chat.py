@@ -10,9 +10,17 @@ from langchain_core.messages import (
     trim_messages,
 )
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.retrievers import BaseRetriever
 from langchain_core.runnables import RunnableConfig
 
 from helpdesk_rag_chatbot.services.prompts import HELPDESK_PROMPT
+from helpdesk_rag_chatbot.services.rag import (
+    Source,
+    cited_sources,
+    context_tokens,
+    fit_docs,
+    format_context,
+)
 
 
 @dataclass(frozen=True)
@@ -23,22 +31,43 @@ class ImageAttachment:
     data: str
 
 
+@dataclass(frozen=True)
+class ChatReply:
+    """
+    A generated answer and the documents it cites.
+
+    :ivar answer: The model's answer text.
+    :ivar sources: The documents the answer cites with ``[n]`` markers, once
+        each, in order of first mention. Empty if it cites none.
+    """
+
+    answer: str
+    sources: list[Source]
+
+
 class ChatService:
     """
-    Generate helpdesk replies using a chat model.
+    Generate helpdesk replies grounded in retrieved documents.
 
-    Each reply loads the session's earlier turns (trimmed to a token budget),
-    sends them with the new question and an optional image to the model, and
-    saves the question and answer to the history only if the call succeeds. An
-    image is sent to the model but never stored: the history keeps a text
-    marker instead.
+    Each reply retrieves chunks for the question, keeps the top-ranked ones
+    that fit the context budget, and gives the earlier turns of the session
+    whatever budget is left. It sends the numbered chunks, the trimmed history,
+    the new question and an optional image to the model, and returns the
+    answer with the sources it cites. The question and answer are saved to the
+    history only if the call succeeds. An image is sent to the model but never
+    stored: the history keeps a text marker instead.
 
     :ivar chat_model: The chat model used to generate replies.
     :ivar history_max_tokens: Token budget for the earlier turns sent to the
         model. Older turns are dropped from the prompt, not from the stored
         history.
+    :ivar context_max_tokens: Token budget shared by the retrieved chunks and
+        the earlier turns. Chunks are fitted first; history gets what is left,
+        up to ``history_max_tokens``.
     :ivar callbacks: LangChain callback handlers run on every reply, for
         example tracing. An empty list means no callbacks.
+    :ivar retriever: Finds the chunks for a question, or None to answer
+        without retrieved context.
     :ivar chain: The prompt, chat model and output parser, built once and
         reused for every reply.
     """
@@ -48,11 +77,15 @@ class ChatService:
         chat_model: BaseChatModel,
         callbacks: list[BaseCallbackHandler] | None = None,
         *,
+        retriever: BaseRetriever | None = None,
         history_max_tokens: int = 2000,
+        context_max_tokens: int = 3000,
     ):
         self.chat_model = chat_model
         self.history_max_tokens = history_max_tokens
+        self.context_max_tokens = context_max_tokens
         self.callbacks = callbacks or []
+        self.retriever = retriever
         # Declaring the chain here to avoid re-creating it for every reply, which would be inefficient.
         self.chain = HELPDESK_PROMPT | self.chat_model | StrOutputParser()
 
@@ -62,6 +95,10 @@ class ChatService:
         user_id: str,
         session_id: str,
         request_id: str,
+        chunks_retrieved: int,
+        chunks_sent: int,
+        context_tokens_used: int,
+        history_budget: int,
         past: list[BaseMessage],
         kept: list[BaseMessage],
         image: ImageAttachment | None,
@@ -75,6 +112,12 @@ class ChatService:
         :param user_id: The unique identifier of the user making the request.
         :param session_id: The unique identifier of the chat session.
         :param request_id: The unique identifier of the chat request.
+        :param chunks_retrieved: How many chunks the retriever returned.
+        :param chunks_sent: How many of them fit ``context_max_tokens`` and
+            were sent to the model.
+        :param context_tokens_used: Approximate tokens of the formatted context.
+        :param history_budget: Tokens the history was trimmed to: what the
+            context left of the budget, at most ``history_max_tokens``.
         :param past: All stored messages of the session, before trimming.
         :param kept: The messages of ``past`` that fit the token budget and are
             sent to the model.
@@ -96,6 +139,10 @@ class ChatService:
                 # Tags are immutable and can only be set when the trace is created.
                 "langfuse_tags": ["chat"],
                 "request_id": request_id,
+                "chunks_retrieved": chunks_retrieved,
+                "chunks_sent": chunks_sent,
+                "context_tokens": context_tokens_used,
+                "history_budget": history_budget,
                 "history_messages_total": len(past),
                 "history_messages_sent": len(kept),
                 "has_image": image is not None,
@@ -140,22 +187,46 @@ class ChatService:
             return message
         return f"{message}\n[image: {image.mime_type}]"
 
+    @staticmethod
+    def _history_budget(history_max: int, context_max: int, used: int) -> int:
+        """
+        Work out how many tokens of history fit next to the retrieved context.
+
+        History gets whatever the documents left of the context budget, but
+        never more than its own cap, and never less than zero.
+
+        :param history_max: The history cap, ``HISTORY_MAX_TOKENS``.
+        :param context_max: The shared budget, ``CONTEXT_MAX_TOKENS``.
+        :param used: Tokens already used by the formatted context.
+        :return: The token budget for ``trim_messages``; 0 if no room is left.
+        """
+        return max(0, min(history_max, context_max - used))
+
     async def reply(
         self,
         message: str,
-        context: str = "",
         *,
         image: ImageAttachment | None = None,
         user_id: str,
         request_id: str,
         session_id: str,
         history: BaseChatMessageHistory,
-    ) -> str:
+    ) -> ChatReply:
         """
-        Generate a reply to the given message using the chat model.
+        Answer a message from the retrieved documents and the session history.
 
-        :param message: The input message to generate a reply for.
-        :param context: The context to use for generating the reply.
+        The steps, in order:
+
+        1. Retrieve chunks for ``message`` (none without a retriever).
+        2. Keep the top-ranked chunks that fit ``context_max_tokens``
+           (``fit_docs``) and number them as ``[n]`` blocks.
+        3. Give the history what the chunks left of that budget, at most
+           ``history_max_tokens``, and keep the newest turns that fit.
+        4. Call the model, then save the question and answer.
+        5. Map the answer's ``[n]`` citations to sources. Only chunks that
+           were sent count: a citation of a dropped chunk is ignored.
+
+        :param message: The user's question. It is also the retrieval query.
         :param image: An optional image to send to the model with the question.
             It is not stored: the history keeps a text marker instead.
         :param user_id: The unique identifier of the user making the request.
@@ -164,14 +235,28 @@ class ChatService:
         :param history: The stored messages of this session. Earlier turns are
             loaded into the prompt, and the new question and answer are saved
             only after the model call succeeds.
-        :return: The generated reply as a string.
+        :return: The answer and the sources it cites.
         """
+
+        if self.retriever is not None:
+            docs = await self.retriever.ainvoke(message)
+        else:
+            docs = []
+
+        sent = fit_docs(docs, self.context_max_tokens)
+
+        context = format_context(sent)
+        used = context_tokens(context)
+
+        history_budget = self._history_budget(
+            self.history_max_tokens, self.context_max_tokens, used
+        )
 
         past = await history.aget_messages()
 
         kept = trim_messages(
             past,
-            max_tokens=self.history_max_tokens,
+            max_tokens=history_budget,
             token_counter="approximate",
             strategy="last",  # keep the newest messages
             start_on="human",  # never start with an answer whose question was cut
@@ -189,6 +274,10 @@ class ChatService:
                 user_id=user_id,
                 session_id=session_id,
                 request_id=request_id,
+                chunks_retrieved=len(docs),
+                chunks_sent=len(sent),
+                context_tokens_used=used,
+                history_budget=history_budget,
                 past=past,
                 kept=kept,
                 image=image,
@@ -200,4 +289,4 @@ class ChatService:
             [HumanMessage(content=saved), AIMessage(content=answer)]
         )
 
-        return answer
+        return ChatReply(answer=answer, sources=cited_sources(answer, sent))

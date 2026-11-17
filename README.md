@@ -42,7 +42,8 @@ Open http://127.0.0.1:8000/docs to try the endpoints:
 
 - `GET /health` returns `{"status": "ok"}`.
 - `POST /chat` takes `user_id` and `session_id` (both UUID7) and a `message`
-  (1 to 1000 characters), and returns an `answer` and a `request_id`. To get a
+  (1 to 1000 characters), and returns an `answer`, its `sources` and a
+  `request_id` (see [Answers and citations](#answers-and-citations)). To get a
   UUID7, run `uv run python -c "import uuid; print(uuid.uuid7())"`.
   An optional `image` (`{"media_type": "image/png", "data": "<base64>"}`) adds a
   screenshot: PNG, JPEG or WebP, raw base64 without a `data:` prefix, at most
@@ -109,6 +110,11 @@ A smaller budget makes each call cheaper and faster, but the model forgets earli
 turns sooner. `0` or a negative value stops the app at startup. Each Langfuse
 trace shows `history_messages_total` and `history_messages_sent` in its metadata,
 so you can see how much was left out.
+
+The history shares one budget with the retrieved document chunks,
+`CONTEXT_MAX_TOKENS` (default `3000`). Chunks are fitted first; history gets
+what is left, at most `HISTORY_MAX_TOKENS`. Traces also show `chunks_retrieved`,
+`chunks_sent`, `context_tokens` and `history_budget`.
 
 ### See traces in Langfuse
 
@@ -288,3 +294,14 @@ superseded version never reaches the answer.
 | Setting | Default | Meaning |
 |---|---|---|
 | `RETRIEVAL_K` | `4` | chunks returned per question; must be > 0 |
+| `CONTEXT_MAX_TOKENS` | `3000` | shared token budget for the chunks and the history; must be > 0 |
+
+### Answers and citations
+
+`POST /chat` numbers the retrieved chunks `[1]..[n]` in the prompt, and the
+model cites them inline: "You can work abroad 20 days a year [1]." `sources`
+lists only the documents the answer cites, once each, with `doc_id`, `title`,
+`version` and `numbers` (the `[n]` markers that point to it). A question the
+documents don't cover, or an off-topic one, gets `"sources": []`. A message the
+provider's content filter blocks gets a short refusal instead of an error (see
+[ADR 0010](docs/adr/0010-rag-context-and-citations.md)).

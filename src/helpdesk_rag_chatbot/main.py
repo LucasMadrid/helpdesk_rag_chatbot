@@ -4,11 +4,13 @@ from importlib.metadata import version
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from openai import BadRequestError
 from psycopg_pool import PoolTimeout
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from helpdesk_rag_chatbot.adapters.chat_history import create_chat_history_table
 from helpdesk_rag_chatbot.adapters.db import build_db_pool
+from helpdesk_rag_chatbot.adapters.embeddings import get_embeddings
 from helpdesk_rag_chatbot.adapters.llm import LLM_UNAVAILABLE_ERRORS, get_chat_model
 from helpdesk_rag_chatbot.adapters.sessions import (
     SessionNotFound,
@@ -18,9 +20,15 @@ from helpdesk_rag_chatbot.adapters.tracing import (
     get_callback_handlers,
     shutdown_tracing,
 )
+from helpdesk_rag_chatbot.adapters.vectorstore import (
+    CURRENT_ONLY_FILTER,
+    get_retriever,
+    get_vector_store,
+)
 from helpdesk_rag_chatbot.api.chat import router as chat_router
 from helpdesk_rag_chatbot.api.errors import (
     db_pool_timeout_handler,
+    llm_bad_request_handler,
     llm_unavailable_handler,
     session_not_found_handler,
     validation_error_handler,
@@ -48,12 +56,17 @@ def make_lifespan(settings: Settings | None = None):
         """
         Manage the application's startup and shutdown.
 
-        On startup, open one ``AsyncConnectionPool`` for app-db with
+        On startup, build the embedding client and the Pinecone vector store
+        for the ``splitter`` namespace first; the store looks up its index over
+        the network, so startup fails before the pool opens if Pinecone is
+        unreachable. Then open one ``AsyncConnectionPool`` for app-db with
         ``wait=True`` (startup fails with ``PoolTimeout`` if the database is
-        unreachable), create the chat history table, and store the pool in
-        ``app.state.app_db_pool``. Then build a single ``ChatService`` (chat
-        model plus tracing callbacks) and store it in ``app.state.chat_service``,
-        so every request reuses it instead of creating its own (see ADR 0003).
+        unreachable), create the tables, and store the pool in
+        ``app.state.app_db_pool``. Finally build a single ``ChatService`` (chat
+        model, tracing callbacks, token budgets and a retriever that returns
+        the top ``retrieval_k`` current chunks) and store it in
+        ``app.state.chat_service``, so every request reuses it instead of
+        creating its own (see ADR 0003).
 
         On shutdown, flush the buffered Langfuse traces so the last requests are
         not lost, then always close the pool, even if the flush raises.
@@ -63,6 +76,11 @@ def make_lifespan(settings: Settings | None = None):
         resolved = settings or get_settings()
 
         configure_logging(level=resolved.log_level)
+
+        embeddings = get_embeddings(resolved)
+        vector_store = get_vector_store(
+            resolved, embeddings, namespace=resolved.splitter
+        )
 
         app_db_pool = build_db_pool(resolved)
         await app_db_pool.open(wait=True, timeout=5)
@@ -75,7 +93,13 @@ def make_lifespan(settings: Settings | None = None):
             app.state.chat_service = ChatService(
                 chat_model=get_chat_model(resolved),
                 history_max_tokens=resolved.history_max_tokens,
+                context_max_tokens=resolved.context_max_tokens,
                 callbacks=get_callback_handlers(resolved),
+                retriever=get_retriever(
+                    vector_store,
+                    resolved.retrieval_k,
+                    search_filter=CURRENT_ONLY_FILTER,
+                ),
             )
 
             yield
@@ -107,6 +131,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     # Register error handlers: one per exception class, all answering 503
     for exc_type in LLM_UNAVAILABLE_ERRORS:
         app.add_exception_handler(exc_type, llm_unavailable_handler)
+    # Content-filter blocks become a refusal; other bad requests stay a 500.
+    app.add_exception_handler(BadRequestError, llm_bad_request_handler)
     app.add_exception_handler(PoolTimeout, db_pool_timeout_handler)
     app.add_exception_handler(SessionNotFound, session_not_found_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)

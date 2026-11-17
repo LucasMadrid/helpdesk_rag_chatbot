@@ -6,6 +6,8 @@ from collections.abc import Callable, Iterator
 
 import pytest
 from fakes import FakePool
+from langchain_core.embeddings import DeterministicFakeEmbedding
+from langchain_core.vectorstores import InMemoryVectorStore
 
 from helpdesk_rag_chatbot import main
 from helpdesk_rag_chatbot.config import Settings
@@ -99,3 +101,15 @@ def fake_pool(monkeypatch: pytest.MonkeyPatch) -> FakePool:
         main, "create_session_table_and_index", fake_create_sessions_table
     )
     return pool
+
+
+@pytest.fixture
+def fake_vector_store(monkeypatch: pytest.MonkeyPatch) -> InMemoryVectorStore:
+    """Replace the app's Pinecone vector store with an in-memory one.
+
+    Request this in any test that runs the lifespan, otherwise startup tries to
+    reach Pinecone. The returned store is the one the app's retriever searches.
+    """
+    store = InMemoryVectorStore(DeterministicFakeEmbedding(size=8))
+    monkeypatch.setattr(main, "get_vector_store", lambda *args, **kwargs: store)
+    return store

@@ -84,13 +84,30 @@ class ChatRequest(BaseModel):
     image: ImageInput | None = None
 
 
+class SourceOut(BaseModel):
+    """One document an answer cites, as returned by ``POST /chat``."""
+
+    doc_id: str = Field(description="The document's stable id, e.g. it-password-reset.")
+    title: str = Field(description="The document's human-readable title.")
+    version: str = Field(
+        description="The version of the document the answer used, e.g. 2.0."
+    )
+    numbers: list[int] = Field(
+        description="The [n] markers in the answer that point to this document, ascending, e.g. [1, 3]. They only mean something for this one answer."
+    )
+
+
 class ChatResponse(BaseModel):
-    """Response body for ``POST /chat``: the generated answer and its request ID."""
+    """Response body for ``POST /chat``: the answer, its sources and request ID."""
 
     request_id: UUID7 = Field(
         description="The server-generated unique identifier (UUIDv7) of this request. It is also attached to traces, so the client can quote it when reporting a problem."
     )
     answer: str = Field(description="The generated response text from the chatbot.")
+    sources: list[SourceOut] = Field(
+        default=[],
+        description="The documents the answer cites with [n] markers, once each, in order of first mention. Empty if it cites none.",
+    )
 
 
 router = APIRouter()
@@ -109,7 +126,7 @@ async def chat(
     :param body: The validated request containing the user, session, and message.
     :param request_id: The ID the request ID middleware assigned to this request.
     :param service: The service that generates a reply for the chat message.
-    :return: The generated answer and the request ID used to track this call.
+    :return: The answer, its cited sources and the request ID of this call.
     """
     logger.info(
         "chat request received",
@@ -124,7 +141,7 @@ async def chat(
     if body.image is not None:
         image = ImageAttachment(mime_type=body.image.media_type, data=body.image.data)
 
-    answer = await service.reply(
+    reply = await service.reply(
         body.message,
         request_id=request_id,
         user_id=str(body.user_id),
@@ -132,4 +149,17 @@ async def chat(
         history=history,
         image=image,
     )
-    return ChatResponse(request_id=UUID(request_id), answer=answer)
+
+    return ChatResponse(
+        request_id=UUID(request_id),
+        answer=reply.answer,
+        sources=[
+            SourceOut(
+                doc_id=s.doc_id,
+                title=s.title,
+                version=s.version,
+                numbers=list(s.numbers),
+            )
+            for s in reply.sources
+        ],
+    )
