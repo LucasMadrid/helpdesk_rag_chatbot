@@ -1,11 +1,19 @@
 import logging
+from uuid import UUID
 
 from fastapi import Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from helpdesk_rag_chatbot.adapters.llm import is_content_filtered
+from helpdesk_rag_chatbot.api.chat import ChatResponse
+
 logger = logging.getLogger(__name__)
+
+# Same wording the prompt's scope rule makes the model use, so a blocked
+# message looks like any other out-of-scope request to the user.
+CONTENT_FILTER_REFUSAL = "I can only help with Corvane helpdesk questions."
 
 
 async def llm_unavailable_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -34,6 +42,40 @@ async def llm_unavailable_handler(request: Request, exc: Exception) -> JSONRespo
             "request_id": request_id,
         },
     )
+
+
+async def llm_bad_request_handler(request: Request, exc: Exception) -> JSONResponse:
+    """
+    Answer a message the provider's content filter blocked with a plain refusal.
+
+    The filter runs before the model, so the prompt's own rules never see the
+    message. The user gets the same refusal as for any out-of-scope question,
+    as a normal ``POST /chat`` body with no sources, instead of a 500. It is
+    logged at WARNING without a traceback or the exception text. The error is
+    raised before the history is saved, so the blocked turn is not stored.
+
+    Any other bad request is our bug: it is re-raised, so the request ID
+    middleware logs it and answers 500 as before.
+
+    :param request: The request that failed; its state holds the request ID.
+    :param exc: The ``BadRequestError`` raised by the chat model.
+    :return: A 200 JSON response shaped like ``ChatResponse``.
+    :raises Exception: ``exc`` itself, if it is not a content-filter block.
+    """
+    if not is_content_filtered(exc):
+        # Re-raising from a handler is allowed: the error goes up to the
+        # add_request_id middleware, which logs it and answers 500.
+        raise exc
+
+    logger.warning(
+        "message blocked by content filter", extra={"error_type": type(exc).__name__}
+    )
+    body = ChatResponse(
+        request_id=UUID(request.state.request_id),
+        answer=CONTENT_FILTER_REFUSAL,
+        sources=[],
+    )
+    return JSONResponse(status_code=200, content=body.model_dump(mode="json"))
 
 
 async def session_not_found_handler(request: Request, exc: Exception) -> JSONResponse:
