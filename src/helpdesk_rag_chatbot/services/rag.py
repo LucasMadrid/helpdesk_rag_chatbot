@@ -54,3 +54,28 @@ def context_tokens(context: str) -> int:
     """
 
     return count_tokens_approximately(messages=[SystemMessage(context)])
+
+
+def fit_docs(docs: list[Document], max_tokens: int) -> list[Document]:
+    """
+    Keep the top-ranked chunks whose formatted context fits the token budget.
+
+    Chunks are added in rank order, and each step counts the whole formatted
+    context (``[n]`` headers and separators included), not one chunk alone.
+    It stops at the first chunk that would go over ``max_tokens`` and never
+    skips ahead, so the result is always the first N chunks of ``docs``.
+
+    :param docs: Retrieved chunks, best match first.
+    :param max_tokens: The most tokens the formatted context may use.
+    :return: The longest prefix of ``docs`` that fits; empty if the first
+        chunk alone is too big.
+    """
+    kept: list[Document] = []
+
+    for doc in docs:
+        tokens = context_tokens(format_context(kept + [doc]))
+        if tokens > max_tokens:
+            break
+        kept.append(doc)
+
+    return kept
