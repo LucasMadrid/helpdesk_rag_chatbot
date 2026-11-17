@@ -71,6 +71,24 @@ def test_prompt_renders_system_then_human_with_question():
     assert messages[1].content == "How do I reset my password?"
 
 
+def test_prompt_needs_only_context_history_and_question():
+    # A stray {placeholder} in the prompt text would become a required input
+    # and make every reply fail with a missing-variable error.
+    assert set(HELPDESK_PROMPT.input_variables) == {"context", "history", "question"}
+
+
+def test_prompt_tells_the_model_how_to_cite():
+    system = HELPDESK_PROMPT.format_messages(
+        context="[1] Password Reset (it-password-reset v2.0)\nUse the portal.",
+        history=[],
+        question=[HumanMessage(content="How do I reset my password?")],
+    )[0].content
+
+    # cited_sources parses [n] markers, so the prompt must ask for them.
+    assert "Put [n] right after each sentence that uses source n" in system
+    assert system.rstrip().endswith("Use the portal.")
+
+
 class RecordingHandler(BaseCallbackHandler):
     """Capture the run name and metadata LangChain passes to callbacks."""
 
