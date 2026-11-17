@@ -14,7 +14,6 @@ from helpdesk_rag_chatbot.api.dependencies import (
     SessionStoreDependency,
 )
 from helpdesk_rag_chatbot.services.chat import ImageAttachment
-from helpdesk_rag_chatbot.services.rag import Source
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +84,16 @@ class ChatRequest(BaseModel):
     image: ImageInput | None = None
 
 
+class SourceOut(BaseModel):
+    """One document an answer cites, as returned by ``POST /chat``."""
+
+    doc_id: str = Field(description="The document's stable id, e.g. it-password-reset.")
+    title: str = Field(description="The document's human-readable title.")
+    version: str = Field(
+        description="The version of the document the answer used, e.g. 2.0."
+    )
+
+
 class ChatResponse(BaseModel):
     """Response body for ``POST /chat``: the answer, its sources and request ID."""
 
@@ -92,8 +101,9 @@ class ChatResponse(BaseModel):
         description="The server-generated unique identifier (UUIDv7) of this request. It is also attached to traces, so the client can quote it when reporting a problem."
     )
     answer: str = Field(description="The generated response text from the chatbot.")
-    sources: list[Source] = Field(
-        description="The documents the answer cites, once each, in order of first mention. Empty if it cites none."
+    sources: list[SourceOut] = Field(
+        default=[],
+        description="The documents the answer cites with [n] markers, once each, in order of first mention. Empty if it cites none.",
     )
 
 
@@ -136,6 +146,12 @@ async def chat(
         history=history,
         image=image,
     )
+
     return ChatResponse(
-        request_id=UUID(request_id), answer=reply.answer, sources=reply.sources
+        request_id=UUID(request_id),
+        answer=reply.answer,
+        sources=[
+            SourceOut(doc_id=s.doc_id, title=s.title, version=s.version)
+            for s in reply.sources
+        ],
     )
