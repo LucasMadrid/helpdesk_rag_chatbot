@@ -73,7 +73,9 @@ def test_lifespan_builds_retriever_with_current_only_filter(
     fake_pool: FakePool,
     fake_vector_store: InMemoryVectorStore,
 ) -> None:
-    settings = make_settings(RETRIEVAL_K=6, CONTEXT_MAX_TOKENS=1500)
+    settings = make_settings(
+        RETRIEVAL_K=6, CONTEXT_MAX_TOKENS=1500, RETRIEVAL_MIN_SCORE=0.55
+    )
 
     with TestClient(create_app(settings)) as client:
         service = client.app.state.chat_service
@@ -81,5 +83,10 @@ def test_lifespan_builds_retriever_with_current_only_filter(
     retriever = service.retriever
     assert retriever.vectorstore is fake_vector_store
     # Superseded chunks stay in the index; the filter is what keeps them out.
-    assert retriever.search_kwargs == {"k": 6, "filter": CURRENT_ONLY_FILTER}
+    assert retriever.search_type == "similarity_score_threshold"
+    assert retriever.search_kwargs == {
+        "k": 6,
+        "score_threshold": 0.55,
+        "filter": CURRENT_ONLY_FILTER,
+    }
     assert service.context_max_tokens == 1500

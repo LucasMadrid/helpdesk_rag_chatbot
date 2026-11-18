@@ -1,6 +1,6 @@
 """In-memory test doubles shared by the test modules."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from typing import Any
@@ -11,6 +11,7 @@ from langchain_core.chat_history import (
     BaseChatMessageHistory,
     InMemoryChatMessageHistory,
 )
+from langchain_core.vectorstores import InMemoryVectorStore
 
 from helpdesk_rag_chatbot.adapters.sessions import SessionNotFound
 
@@ -115,3 +116,17 @@ class FakePineconeClient:
     def create_index(self, **kwargs: Any) -> None:
         self.created.append(kwargs)
         self.indexes[kwargs["name"]] = kwargs["dimension"]
+
+
+class ScoredInMemoryVectorStore(InMemoryVectorStore):
+    """An ``InMemoryVectorStore`` that can be searched with a score threshold.
+
+    ``InMemoryVectorStore`` has no relevance-score function, so a
+    ``similarity_score_threshold`` retriever raises ``NotImplementedError`` on
+    it. This one turns cosine similarity (-1 to 1) into a relevance score
+    (0 to 1) with ``(s + 1) / 2``, the same mapping ``PineconeVectorStore``
+    uses, so a threshold means the same thing here as in production.
+    """
+
+    def _select_relevance_score_fn(self) -> Callable[[float], float]:
+        return lambda similarity: (similarity + 1) / 2
