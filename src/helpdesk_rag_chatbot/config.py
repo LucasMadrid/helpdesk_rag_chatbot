@@ -86,6 +86,9 @@ class Settings(BaseSettings):
     context_max_tokens: int = Field(
         default=3000, gt=0, validation_alias="CONTEXT_MAX_TOKENS"
     )
+    retrieval_min_score: float = Field(
+        default=0.4, ge=0, le=1, validation_alias="RETRIEVAL_MIN_SCORE"
+    )
 
     # Log configuration
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(

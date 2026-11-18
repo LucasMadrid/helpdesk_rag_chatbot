@@ -29,6 +29,7 @@ OPTIONAL_ENV = [
     "EMBEDDING_DIMENSIONS",
     "RETRIEVAL_K",
     "CONTEXT_MAX_TOKENS",
+    "RETRIEVAL_MIN_SCORE",
 ]
 
 
@@ -130,6 +131,20 @@ def test_context_max_tokens_of_zero_is_rejected(
     full_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("CONTEXT_MAX_TOKENS", "0")
+
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_retrieval_min_score_defaults_to_0_4(full_env: dict[str, str]) -> None:
+    assert Settings().retrieval_min_score == 0.4
+
+
+def test_retrieval_min_score_above_1_is_rejected(
+    full_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Relevance scores never exceed 1, so a higher threshold would drop every chunk.
+    monkeypatch.setenv("RETRIEVAL_MIN_SCORE", "1.5")
 
     with pytest.raises(ValidationError):
         Settings()
