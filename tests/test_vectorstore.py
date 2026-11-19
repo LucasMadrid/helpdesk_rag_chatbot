@@ -4,7 +4,7 @@ from hashlib import sha256
 from pathlib import Path
 
 import pytest
-from fakes import FakePineconeClient
+from fakes import FakePineconeClient, ScoredInMemoryVectorStore
 from langchain_core.documents import Document
 from langchain_core.embeddings import DeterministicFakeEmbedding
 from langchain_core.vectorstores import InMemoryVectorStore
@@ -31,8 +31,11 @@ def corpus_chunks() -> list[Document]:
 
 @pytest.fixture
 def store() -> InMemoryVectorStore:
-    """An in-memory store with a fake embedder, so no network is needed."""
-    return InMemoryVectorStore(DeterministicFakeEmbedding(size=8))
+    """An in-memory store with a fake embedder, so no network is needed.
+
+    It has relevance scores, so the score-threshold retriever works on it.
+    """
+    return ScoredInMemoryVectorStore(DeterministicFakeEmbedding(size=8))
 
 
 def _chunk(text: str = "Restart the VPN client.", index: int = 3) -> Document:
@@ -153,11 +156,19 @@ def _current_only(doc: Document) -> bool:
     return doc.metadata["status"] == "current"
 
 
+def _current_chunk(text: str, index: int = 0) -> Document:
+    """Build a chunk that ``_current_only`` lets through."""
+    chunk = _chunk(text, index)
+    chunk.metadata["status"] = "current"
+    return chunk
+
+
 def test_get_retriever_passes_k_and_filter(store: InMemoryVectorStore) -> None:
-    retriever = get_retriever(store, 4, CURRENT_ONLY_FILTER)
+    retriever = get_retriever(store, 4, CURRENT_ONLY_FILTER, min_score=0.0)
 
     assert retriever.search_kwargs == {
         "k": 4,
+        "score_threshold": 0.0,
         "filter": {"status": {"$eq": "current"}},
     }
 
@@ -178,7 +189,7 @@ def test_retriever_drops_superseded_twin(store: InMemoryVectorStore) -> None:
     ]
     index_chunks(store, twins)
 
-    docs = get_retriever(store, 4, _current_only).invoke(text)
+    docs = get_retriever(store, 4, _current_only, min_score=0.0).invoke(text)
 
     assert [d.metadata["version"] for d in docs] == ["2.0"]
 
@@ -188,7 +199,9 @@ def test_retriever_returns_at_most_k(
 ) -> None:
     index_chunks(store, corpus_chunks)
 
-    docs = get_retriever(store, 3, _current_only).invoke("How do I reset my password?")
+    docs = get_retriever(store, 3, _current_only, min_score=0.0).invoke(
+        "How do I reset my password?"
+    )
 
     assert len(docs) == 3
 
@@ -198,7 +211,43 @@ def test_retriever_on_corpus_has_no_superseded(
 ) -> None:
     index_chunks(store, corpus_chunks)
 
-    docs = get_retriever(store, 150, _current_only).invoke("remote work policy")
+    docs = get_retriever(store, 150, _current_only, min_score=0.0).invoke(
+        "remote work policy"
+    )
 
     assert len(docs) == 136
     assert all(d.metadata["status"] == "current" for d in docs)
+
+
+def test_get_retriever_uses_the_score_threshold(store: InMemoryVectorStore) -> None:
+    retriever = get_retriever(store, 4, CURRENT_ONLY_FILTER, min_score=0.4)
+
+    assert retriever.search_type == "similarity_score_threshold"
+    assert retriever.search_kwargs["score_threshold"] == 0.4
+
+
+def test_retriever_drops_chunks_below_min_score(store: InMemoryVectorStore) -> None:
+    # The fake embedder gives the same text the same vector, so the exact match
+    # scores 1.0 and the others score lower.
+    question = "How do I reset my password?"
+    texts = [question, "The canteen opens at noon.", "Book a meeting room."]
+    index_chunks(
+        store,
+        [_current_chunk(text, index=i) for i, text in enumerate(texts)],
+    )
+
+    docs = get_retriever(store, 4, _current_only, min_score=0.99).invoke(question)
+
+    assert [d.page_content for d in docs] == [question]
+
+
+def test_retriever_returns_nothing_when_no_chunk_clears_min_score(
+    store: InMemoryVectorStore,
+) -> None:
+    index_chunks(store, [_current_chunk("The canteen opens at noon.")])
+
+    docs = get_retriever(store, 4, _current_only, min_score=0.99).invoke(
+        "How do I reset my password?"
+    )
+
+    assert docs == []

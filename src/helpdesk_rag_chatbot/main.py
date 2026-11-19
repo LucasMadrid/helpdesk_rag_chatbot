@@ -96,8 +96,9 @@ def make_lifespan(settings: Settings | None = None):
                 context_max_tokens=resolved.context_max_tokens,
                 callbacks=get_callback_handlers(resolved),
                 retriever=get_retriever(
-                    vector_store,
-                    resolved.retrieval_k,
+                    store=vector_store,
+                    k=resolved.retrieval_k,
+                    min_score=resolved.retrieval_min_score,
                     search_filter=CURRENT_ONLY_FILTER,
                 ),
             )

@@ -156,13 +156,16 @@ def get_retriever(
     store: VectorStore,
     k: int,
     search_filter: dict[str, Any] | Callable[[Document], bool],
+    min_score: float,
 ) -> VectorStoreRetriever:
     """
-    Build a retriever that returns the ``k`` chunks most similar to a query.
+    Build a retriever that returns up to ``k`` chunks similar enough to a query.
 
-    Search is plain similarity (no MMR or score threshold), and only chunks that
-    match ``search_filter`` are considered. The retriever only searches the
-    namespace ``store`` is bound to, so build one per splitter.
+    Search is similarity with a score threshold (no MMR): only chunks that
+    match ``search_filter`` and score at least ``min_score`` are returned, so
+    an off-topic question can get fewer than ``k`` chunks, or none. The
+    retriever only searches the namespace ``store`` is bound to, so build one
+    per splitter.
 
     :param store: The vector store to search, e.g. from ``get_vector_store``.
     :param k: The maximum number of chunks to return per query.
@@ -170,12 +173,17 @@ def get_retriever(
         the store: a Pinecone metadata filter for ``PineconeVectorStore``, e.g.
         ``{"status": {"$eq": "current"}}``, or a ``Document -> bool`` function
         for ``InMemoryVectorStore``.
+    :param min_score: The lowest relevance score a chunk may have, from 0 to 1
+        (``RETRIEVAL_MIN_SCORE``); 0.0 keeps every chunk. This is the store's
+        relevance score, not the raw similarity ``similarity_search_with_score``
+        returns: Pinecone maps cosine similarity ``s`` to ``(s + 1) / 2``.
     :return: A ``VectorStoreRetriever``; call ``invoke(query)`` to get a list of
-        ``Document``, most similar first.
+        ``Document``, most similar first, possibly empty.
     """
 
     # The filter must go inside search_kwargs: as_retriever drops a top-level
     # filter= without an error, and then superseded chunks come back.
     return store.as_retriever(
-        search_type="similarity", search_kwargs={"k": k, "filter": search_filter}
+        search_type="similarity_score_threshold",
+        search_kwargs={"k": k, "score_threshold": min_score, "filter": search_filter},
     )
