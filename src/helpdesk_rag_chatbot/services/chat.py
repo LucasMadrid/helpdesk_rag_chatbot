@@ -13,7 +13,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.retrievers import BaseRetriever
 from langchain_core.runnables import RunnableConfig
 
-from helpdesk_rag_chatbot.services.prompts import HELPDESK_PROMPT
+from helpdesk_rag_chatbot.services.prompts import HELPDESK_PROMPT, NO_SOURCES
 from helpdesk_rag_chatbot.services.rag import (
     Source,
     cited_sources,
@@ -245,7 +245,7 @@ class ChatService:
 
         sent = fit_docs(docs, self.context_max_tokens)
 
-        context = format_context(sent)
+        context = format_context(sent) or NO_SOURCES
         used = context_tokens(context)
 
         history_budget = self._history_budget(

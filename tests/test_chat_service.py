@@ -11,7 +11,11 @@ from langchain_core.retrievers import BaseRetriever
 from pydantic import Field
 
 from helpdesk_rag_chatbot.services.chat import ChatService, ImageAttachment
-from helpdesk_rag_chatbot.services.prompts import HELPDESK_PROMPT
+from helpdesk_rag_chatbot.services.prompts import (
+    HELPDESK_PROMPT,
+    NO_SOURCES,
+    SYSTEM_PROMPT,
+)
 from helpdesk_rag_chatbot.services.rag import Source, context_tokens, format_context
 
 IDS = {"user_id": "u-1", "request_id": "r-1", "session_id": "s-1"}
@@ -90,6 +94,14 @@ def test_prompt_tells_the_model_how_to_cite():
     # cited_sources parses [n] markers, so the prompt must ask for them.
     assert "Put [n] right after each sentence that uses source n" in system
     assert system.rstrip().endswith("Use the portal.")
+
+
+def test_prompt_tells_the_model_what_to_do_without_sources():
+    # reply sends NO_SOURCES when no chunk passes, so rule 3 must name it, and
+    # the abstain answer must point to the right contact.
+    assert NO_SOURCES in SYSTEM_PROMPT
+    assert "hr@example.com" in SYSTEM_PROMPT
+    assert "servicedesk@example.com" in SYSTEM_PROMPT
 
 
 class RecordingHandler(BaseCallbackHandler):
@@ -275,6 +287,39 @@ def test_reply_ignores_citations_of_chunks_that_were_not_sent():
 
     # [2] was retrieved but dropped by the budget, so it is not a source.
     assert [s.doc_id for s in reply.sources] == ["it-password-reset"]
+
+
+def test_reply_sends_no_sources_marker_when_no_chunk_passes():
+    recorder = PromptRecorder()
+    service = ChatService(
+        FakeListChatModel(responses=["The documents do not cover that."]),
+        callbacks=[recorder],
+        retriever=FakeRetriever(docs=[]),
+    )
+
+    asyncio.run(
+        service.reply(
+            "When does the canteen open?", history=InMemoryChatMessageHistory(), **IDS
+        )
+    )
+
+    assert any("Sources:\n(none)" in p for p in recorder.prompts)
+
+
+def test_reply_cites_nothing_when_no_source_passes():
+    service = ChatService(
+        FakeListChatModel(responses=["Try this [1]."]),
+        retriever=FakeRetriever(docs=[]),
+    )
+
+    reply = asyncio.run(
+        service.reply(
+            "When does the canteen open?", history=InMemoryChatMessageHistory(), **IDS
+        )
+    )
+
+    # No chunk was sent, so a [1] the model makes up points to nothing.
+    assert reply.sources == []
 
 
 def test_reply_gives_history_only_the_budget_left_after_chunks():
