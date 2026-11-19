@@ -136,8 +136,8 @@ def test_context_max_tokens_of_zero_is_rejected(
         Settings()
 
 
-def test_retrieval_min_score_defaults_to_0_4(full_env: dict[str, str]) -> None:
-    assert Settings().retrieval_min_score == 0.4
+def test_retrieval_min_score_defaults_to_0_65(full_env: dict[str, str]) -> None:
+    assert Settings().retrieval_min_score == 0.65
 
 
 def test_retrieval_min_score_above_1_is_rejected(

@@ -289,12 +289,16 @@ so scripts can parse them.
 `get_retriever` (in `helpdesk_rag_chatbot.adapters.vectorstore`) returns the
 chunks most similar to a question, from the splitter's namespace. It only
 returns chunks whose `status` is `current` (`CURRENT_ONLY_FILTER`), so a
-superseded version never reaches the answer.
+superseded version never reaches the answer. Chunks whose relevance score is
+below `RETRIEVAL_MIN_SCORE` are dropped too, so an off-topic question can get
+no chunks at all; the model then sees `(none)` as its sources and says the
+documents don't cover it.
 
 | Setting | Default | Meaning |
 |---|---|---|
 | `RETRIEVAL_K` | `4` | chunks returned per question; must be > 0 |
 | `CONTEXT_MAX_TOKENS` | `3000` | shared token budget for the chunks and the history; must be > 0 |
+| `RETRIEVAL_MIN_SCORE` | `0.65` | lowest relevance score a chunk needs to be used, from 0 to 1. Pinecone's relevance score is `(cosine + 1) / 2`, so it is higher than the raw similarity |
 
 ### Answers and citations
 

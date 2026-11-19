@@ -87,7 +87,7 @@ class Settings(BaseSettings):
         default=3000, gt=0, validation_alias="CONTEXT_MAX_TOKENS"
     )
     retrieval_min_score: float = Field(
-        default=0.4, ge=0, le=1, validation_alias="RETRIEVAL_MIN_SCORE"
+        default=0.65, ge=0, le=1, validation_alias="RETRIEVAL_MIN_SCORE"
     )
 
     # Log configuration
