@@ -74,7 +74,7 @@ def test_lifespan_builds_retriever_with_current_only_filter(
     fake_vector_store: InMemoryVectorStore,
 ) -> None:
     settings = make_settings(
-        RETRIEVAL_K=6, CONTEXT_MAX_TOKENS=1500, RETRIEVAL_MIN_SCORE=0.55
+        RETRIEVAL_K=6, CONTEXT_MAX_TOKENS=1500, RETRIEVAL_MIN_SCORE=0.65
     )
 
     with TestClient(create_app(settings)) as client:
@@ -86,7 +86,7 @@ def test_lifespan_builds_retriever_with_current_only_filter(
     assert retriever.search_type == "similarity_score_threshold"
     assert retriever.search_kwargs == {
         "k": 6,
-        "score_threshold": 0.55,
+        "score_threshold": 0.65,
         "filter": CURRENT_ONLY_FILTER,
     }
     assert service.context_max_tokens == 1500
