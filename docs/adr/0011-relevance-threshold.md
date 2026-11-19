@@ -102,4 +102,14 @@ Top-1 chunk per question, `recursive` namespace, current versions only, 2026-11-
 
 - The W5-02 canteen scores (0.277 to 0.287) were raw cosine. In the unit the retriever compares, the same chunks score about 0.64. A threshold of 0.4 picked from the raw numbers would have let every off-topic chunk through.
 - `InMemoryVectorStore` raises `NotImplementedError` for relevance scores, so a score-threshold retriever can't be tested on it without a subclass.
-- Live run (step 7): _fill in: canteen chunks retrieved, "Hi there!" reply, working-abroad source._
+- Live run (step 7, 2026-11-19), same three questions at two thresholds:
+
+  | Question | top rel | 0.60: chunks sent | 0.65: chunks sent | Answer at 0.65 | Sources |
+  |---|---|---|---|---|---|
+  | What time does the canteen open? | 0.643 | 4 | 0 | the documents don't cover it; Service Desk, ext. 4357 | none |
+  | Can I work from abroad for a few weeks? | 0.837 | 4 | 4 | 20 working days a year with HR approval, request in Orbit HR | `hr-remote-work-policy` v2.0 [1] |
+  | Hi there! | 0.619 | 4 | 0 | a short greeting and an offer to help | none |
+
+- At 0.60 the canteen question sent 4 off-topic chunks and the model still abstained: prompt rule 3 caught it. At 0.65 the code stops it first. Two layers, each working on its own.
+- The canteen question worded as "What time does the canteen open?" scores 0.643, only 0.007 under the threshold (the "menu on Friday" wording scored 0.629). The off-topic side of the gap is closer than the measurement table suggested; W6 evals should include several wordings of each off-topic question.
+- A local `.env` had `RETRIEVAL_MIN_SCORE=0.6`, and an environment variable beats the default in `Settings`. The first live run silently used 0.60. Check the effective value, not only the default.
