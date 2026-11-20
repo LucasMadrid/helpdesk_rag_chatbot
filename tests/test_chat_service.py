@@ -610,3 +610,52 @@ def test_rewrite_sends_run_name_and_ids_to_callbacks():
         and m.get("request_id") == "r-1"
         for m in handler.metadata
     )
+
+
+def test_follow_up_answer_gets_the_original_message():
+    spy = PromptSpy()
+    service = ChatService(
+        FakeListChatModel(responses=["How do I set up the VPN on Mac?", "a2"]),
+        callbacks=[spy],
+        retriever=FakeRetriever(docs=[]),
+    )
+
+    asyncio.run(service.reply("and on Mac?", history=_history_with_turns(1), **IDS))
+
+    # prompts[1] is the answer call. The rewrite only feeds retrieval; the model
+    # answers what the user wrote, with the history for context.
+    assert spy.prompts[1][-1].content == "and on Mac?"
+
+
+def test_history_saves_the_original_message_not_the_rewrite():
+    history = _history_with_turns(1)
+    service = ChatService(
+        FakeListChatModel(responses=["How do I set up the VPN on Mac?", "a2"]),
+        retriever=FakeRetriever(docs=[]),
+    )
+
+    asyncio.run(service.reply("and on Mac?", history=history, **IDS))
+
+    assert [(m.type, m.content) for m in history.messages[-2:]] == [
+        ("human", "and on Mac?"),
+        ("ai", "a2"),
+    ]
+
+
+def test_rewrite_prompt_never_gets_the_image():
+    spy = PromptSpy()
+    service = ChatService(
+        FakeListChatModel(responses=["What does this VPN error mean?", "a2"]),
+        callbacks=[spy],
+        retriever=FakeRetriever(docs=[]),
+    )
+    image = ImageAttachment(mime_type="image/png", data="iVBORw0KGgo=")
+
+    asyncio.run(
+        service.reply(
+            "and this one?", image=image, history=_history_with_turns(1), **IDS
+        )
+    )
+
+    # prompts[0] is the rewrite call: plain text only, no image blocks.
+    assert all(isinstance(m.content, str) for m in spy.prompts[0])
