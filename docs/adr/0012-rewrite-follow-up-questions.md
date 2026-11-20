@@ -75,10 +75,13 @@ We choose option 4.
 - The first baseline used only "And for contractors?" and worked: a keyword in the follow-up matched the right chunk. A follow-up with no topic word ("more days than that?") was needed to show the failure. Test the hard case, not the example from the ticket.
 - The answer model already resolves follow-ups from the history. The failure is in retrieval: wrong chunks plus a strict "cite only sources" prompt led the model to contradict its own earlier answer.
 - Side finding for the W6 citation evals: the turn 3 abstain still cited [3], which breaks prompt rule 3.
-- After (step 6, to fill in):
+- After (step 6, 2026-11-20, same session and settings):
 
-  | Turn | Retrieval query | Top chunk | Answer |
+  | Turn | Retrieval query | Chunks (ranked) | Answer |
   |---|---|---|---|
-  | 2 | TODO | TODO | TODO |
-  | 3 | TODO | TODO | TODO |
-  | 4 | TODO (expected unchanged) | TODO | TODO |
+  | 2 | How many days per year can contractors work from another country? | remote-work v2.0 ×4 | contractors follow their own agreements [2] ✅ |
+  | 3 | What should I do if I need to work from another country for more than 20 working days per calendar year? | **remote-work v2.0**, leave-policy, remote-work v2.0, expense-travel | for more than 20 working days, contact HR [1] ✅ |
+  | 4 | How do I reset my password? (unchanged) | password-mfa v2.0, known-errors-faq, password-mfa v2.0, password-mfa v2.0 | reset steps [1][2] ✅ |
+
+- Turn 2 went from 2 of 4 remote-work chunks (ranked 2nd and 4th) to 4 of 4. Turn 3 went from leave-policy first and a wrong abstain to remote-work first and the right answer. The rewriter carried "20 working days" over from turn 1's answer, so it reads the AI turns too, not only the questions.
+- Turn 4 was already standalone and came back unchanged. The 4 turns made 7 model calls: 4 answers and 3 rewrites.
