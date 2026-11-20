@@ -1,0 +1,204 @@
+# Eval questions: the source of truth for the Langfuse datasets (W6-01).
+# Edit this file, never the items in the Langfuse UI.
+# split: tune (used while developing) or holdout (run once, at the end of W7).
+# sources: [] means the docs don't cover it, so the bot should abstain.
+
+- id: Q01
+  split: tune
+  type: single
+  question: "How do I reset my password?"
+  answer: "Go to id.example.com/reset, enter your Corvane email, approve the Corvane Verify prompt with the number shown, set a new password of at least 14 characters, confirm it, then sign in on your laptop on the office network or SecureLink."
+  sources:
+    - doc_id: it-password-mfa-policy
+      version: "2.0"
+      section: "How to reset your password"
+
+- id: Q02
+  split: tune
+  type: trap
+  question: "My VPN says error 809"
+  answer: "The network blocks VPN traffic, not your password. Check internet, complete any Wi-Fi sign-in page, switch Protocol to TLS (port 443), turn off other VPNs, restart your home router, try a phone hotspot, then reinstall SecureLink."
+  sources:
+    - doc_id: it-vpn-guide
+      version: "1.0"
+      section: "Fixing error 809"
+
+- id: Q03
+  split: tune
+  type: single
+  question: "How many vacation days do I have?"
+  answer: "25 days per calendar year; from year 3 you gain 1 extra day for every 2 years of service, up to 30. Your balance is on the Time off page in Orbit HR."
+  sources:
+    - doc_id: hr-leave-policy
+      version: "1.0"
+      section: "Vacation entitlement"
+
+- id: Q04
+  split: tune
+  type: version
+  question: "What is the minimum length for my Corvane ID password?"
+  answer: "14 characters; passphrases allowed, no complexity rules (the 12-character rule is from superseded v1.0)."
+  sources:
+    - doc_id: it-password-mfa-policy
+      version: "2.0"
+      section: "Password requirements"
+
+- id: Q05
+  split: tune
+  type: version
+  question: "Can I still get my MFA code by SMS?"
+  answer: "No. SMS was removed on 1 September 2025; use Corvane Verify push or a FIDO2 security key."
+  sources:
+    - doc_id: it-password-mfa-policy
+      version: "2.0"
+      section: "Multi-factor authentication"
+
+- id: Q06
+  split: tune
+  type: version
+  question: "How many days a year can I work from another country?"
+  answer: "Up to 20 working days per calendar year, with HR approval requested in Orbit HR at least 15 working days before you travel."
+  sources:
+    - doc_id: hr-remote-work-policy
+      version: "2.0"
+      section: "Limits and approval"
+
+- id: Q07
+  split: tune
+  type: trap
+  question: "How many remote days per week can I work while on probation?"
+  answer: "2 days per week during probation (six months); after probation the standard 3 applies from the following week."
+  sources:
+    - doc_id: hr-remote-work-policy
+      version: "2.0"
+      section: "Exceptions"
+
+- id: Q08
+  split: tune
+  type: version
+  question: "How much is the home-office allowance?"
+  answer: "EUR 500 every 3 years, plus EUR 20 per month internet allowance paid via payroll (not the old one-off EUR 300)."
+  sources:
+    - doc_id: hr-remote-work-policy
+      version: "2.0"
+      section: "Allowance"
+
+- id: Q09
+  split: tune
+  type: image-error-code
+  question: "I get 'Your account has been locked. Contact your administrator'. What should I do?"
+  answer: "Shown after 10 failed sign-in attempts; the lock clears automatically after 30 minutes. Check no phone or mail app uses an old password."
+  sources:
+    - doc_id: it-known-errors-faq
+      version: "1.0"
+      section: "What does \"Your account has been locked\" mean?"
+
+- id: Q10
+  split: tune
+  type: image-error-code
+  question: "Teams shows error caa20002. What should I do?"
+  answer: "Expired sign-in token: sign out of Teams, quit it, sign in again with Corvane ID; if it returns, clear the cache via Settings, then Reset app."
+  sources:
+    - doc_id: it-known-errors-faq
+      version: "1.0"
+      section: "Teams shows error caa20002. What should I do?"
+
+- id: Q11
+  split: tune
+  type: unanswerable
+  question: "Where can I park my car at the Dublin office?"
+  answer: "Not covered in the docs. The commuting allowance covers public transport only; ask Facilities or your manager."
+  sources: []
+
+- id: Q12
+  split: tune
+  type: unanswerable
+  question: "What is the guest Wi-Fi password?"
+  answer: "Not covered in the docs; the bot should not invent one and should point to the Service Desk."
+  sources: []
+
+- id: Q13
+  split: tune
+  type: unanswerable
+  question: "Do Corvane employees get share options?"
+  answer: "Not covered; the benefits table lists pension, health insurance, commuting, training budget and home internet only."
+  sources: []
+
+- id: Q14
+  split: tune
+  type: near-miss
+  question: "How do I install SecureLink on Linux?"
+  answer: "Not possible: SecureLink is supported on Corvane-managed Windows and macOS laptops only."
+  sources:
+    - doc_id: it-vpn-guide
+      version: "1.0"
+      section: "SecureLink VPN Setup and Troubleshooting"
+
+- id: Q15
+  split: tune
+  type: near-miss
+  question: "How do I request a company mobile phone?"
+  answer: "Not covered: the laptop process covers laptops only; the bot should say so and suggest asking the Service Desk."
+  sources:
+    - doc_id: it-laptop-request
+      version: "1.0"
+      section: "Laptop Request and Replacement"
+
+- id: Q16
+  split: tune
+  type: near-miss
+  question: "How many weeks of parental leave do I get?"
+  answer: "No number is given: \"See your contract\", and contact People Operations at hr@example.com."
+  sources:
+    - doc_id: hr-leave-policy
+      version: "1.0"
+      section: "Leave types at a glance"
+
+- id: Q17
+  split: tune
+  type: near-miss
+  question: "What mileage rate can I claim for an electric scooter?"
+  answer: "Only a car mileage rate is defined (EUR 0.35 per km, Clause 2.3); there is no scooter rate."
+  sources:
+    - doc_id: hr-expense-travel-policy
+      version: "1.0"
+      section: "Part 2: Business travel"
+
+- id: Q18
+  split: tune
+  type: multi-doc
+  question: "When does a new starter's laptop arrive, and how early must the hiring manager request it?"
+  answer: "Shipped to the home address 3 working days before the start date; the hiring manager requests it at least 10 working days before the start date."
+  sources:
+    - doc_id: hr-onboarding-guide
+      version: "1.0"
+      section: "Equipment"
+    - doc_id: it-laptop-request
+      version: "1.0"
+      section: "Requesting or replacing a laptop"
+
+- id: Q19
+  split: tune
+  type: multi-doc
+  question: "I clicked a phishing link on Saturday evening. Who do I call and how fast will they respond?"
+  answer: "Report within 1 hour: call ext. 4357 and choose option 9 (or security@example.com). It is P1: response in 15 minutes, resolution target 4 hours."
+  sources:
+    - doc_id: it-security-incident-reporting
+      version: "1.0"
+      section: "Reporting a suspected incident"
+    - doc_id: gen-service-desk-contacts
+      version: "1.0"
+      section: "Priorities and response times"
+
+- id: Q20
+  split: tune
+  type: multi-doc
+  question: "How long do I have to submit expenses normally, and how long if I am leaving?"
+  answer: "Normally within 30 days of the cost (Clause 1.2); leavers must submit final expenses within 10 days of their last working day."
+  sources:
+    - doc_id: hr-expense-travel-policy
+      version: "1.0"
+      section: "Part 1: Claiming expenses"
+    - doc_id: hr-offboarding-checklist
+      version: "1.0"
+      section: "Employee"

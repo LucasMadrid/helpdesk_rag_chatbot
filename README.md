@@ -211,8 +211,8 @@ current one. Some topics (parking, the canteen) are left out on purpose to test
 
 To add a document, follow the same naming and metadata, then run
 `uv run pytest tests/test_corpus.py`: it checks the metadata, the file names
-and that each `doc_id` has exactly one current version. Starter eval questions
-are in `evals/seed_questions.md`.
+and that each `doc_id` has exactly one current version. The eval questions are
+in `evals/questions.yaml`.
 
 ### Loading the corpus
 
