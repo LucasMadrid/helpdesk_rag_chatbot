@@ -292,7 +292,11 @@ returns chunks whose `status` is `current` (`CURRENT_ONLY_FILTER`), so a
 superseded version never reaches the answer. Chunks whose relevance score is
 below `RETRIEVAL_MIN_SCORE` are dropped too, so an off-topic question can get
 no chunks at all; the model then sees `(none)` as its sources and says the
-documents don't cover it.
+documents don't cover it (see
+[ADR 0011](docs/adr/0011-relevance-threshold.md)). A follow-up question like
+"and in Lisbon?" is first rewritten into a standalone question from the recent
+history, so the retriever searches for what the user means (see
+[ADR 0012](docs/adr/0012-rewrite-follow-up-questions.md)).
 
 | Setting | Default | Meaning |
 |---|---|---|
