@@ -115,6 +115,8 @@ class ChatService:
         past: list[BaseMessage],
         kept: list[BaseMessage],
         image: ImageAttachment | None,
+        message: str,
+        query: str,
     ) -> RunnableConfig:
         """
         Build the LangChain run config for one reply.
@@ -136,6 +138,9 @@ class ChatService:
             sent to the model.
         :param image: The attached image, or None. Only its presence is
             recorded; the image data never goes into the metadata.
+        :param message: The user's question, as typed.
+        :param query: The query sent to the retriever: the rewritten question,
+            or ``message`` when no rewrite was made.
         :return: The config to pass to the chain.
         """
         return {
@@ -159,6 +164,8 @@ class ChatService:
                 "history_messages_total": len(past),
                 "history_messages_sent": len(kept),
                 "has_image": image is not None,
+                "retrieval_query": query,
+                "question_rewritten": query != message,
             },
         }
 
@@ -289,7 +296,8 @@ class ChatService:
 
         The steps, in order:
 
-        1. Retrieve chunks for ``message`` (none without a retriever).
+        1. Retrieve chunks for ``message`` (none without a retriever). With
+           history, a follow-up is first rewritten as a standalone question.
         2. Keep the top-ranked chunks that fit ``context_max_tokens``
            (``fit_docs``) and number them as ``[n]`` blocks.
         3. Give the history what the chunks left of that budget, at most
@@ -298,7 +306,8 @@ class ChatService:
         5. Map the answer's ``[n]`` citations to sources. Only chunks that
            were sent count: a citation of a dropped chunk is ignored.
 
-        :param message: The user's question. It is also the retrieval query.
+        :param message: The user's question. The model answers it as typed;
+            only retrieval may use a rewritten version.
         :param image: An optional image to send to the model with the question.
             It is not stored: the history keeps a text marker instead.
         :param user_id: The unique identifier of the user making the request.
@@ -323,6 +332,7 @@ class ChatService:
             )
             docs = await self.retriever.ainvoke(query)
         else:
+            query = message
             docs = []
 
         sent = fit_docs(docs, self.context_max_tokens)
@@ -361,6 +371,8 @@ class ChatService:
                 past=past,
                 kept=kept,
                 image=image,
+                message=message,
+                query=query,
             ),
         )
 

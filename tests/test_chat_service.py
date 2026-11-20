@@ -160,6 +160,30 @@ def test_reply_records_retrieval_in_trace_metadata():
         and m.get("chunks_sent") == 1
         and m.get("context_tokens") == used
         and m.get("history_budget") == 100
+        # No history, so nothing to rewrite: the message is the query.
+        and m.get("retrieval_query") == "hi"
+        and m.get("question_rewritten") is False
+        for m in handler.metadata
+    )
+
+
+def test_reply_records_the_rewritten_query_in_trace_metadata():
+    handler = RecordingHandler()
+    service = ChatService(
+        FakeListChatModel(responses=["How do I set up the VPN on Mac?", "a2"]),
+        callbacks=[handler],
+        retriever=FakeRetriever(docs=[]),
+    )
+    history = InMemoryChatMessageHistory()
+    history.add_user_message("q1")
+    history.add_ai_message("a1")
+
+    asyncio.run(service.reply("and on Mac?", history=history, **IDS))
+
+    assert any(
+        m.get("langfuse_tags") == ["chat"]
+        and m.get("retrieval_query") == "How do I set up the VPN on Mac?"
+        and m.get("question_rewritten") is True
         for m in handler.metadata
     )
 
