@@ -13,7 +13,11 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.retrievers import BaseRetriever
 from langchain_core.runnables import RunnableConfig
 
-from helpdesk_rag_chatbot.services.prompts import HELPDESK_PROMPT, NO_SOURCES
+from helpdesk_rag_chatbot.services.prompts import (
+    CONDENSE_PROMPT,
+    HELPDESK_PROMPT,
+    NO_SOURCES,
+)
 from helpdesk_rag_chatbot.services.rag import (
     Source,
     cited_sources,
@@ -64,12 +68,17 @@ class ChatService:
     :ivar context_max_tokens: Token budget shared by the retrieved chunks and
         the earlier turns. Chunks are fitted first; history gets what is left,
         up to ``history_max_tokens``.
+    :ivar rewrite_history_messages: How many of the newest stored messages the
+        question rewrite sees. 0 turns the rewrite off, so the message itself
+        is the retrieval query.
     :ivar callbacks: LangChain callback handlers run on every reply, for
         example tracing. An empty list means no callbacks.
     :ivar retriever: Finds the chunks for a question, or None to answer
         without retrieved context.
     :ivar chain: The prompt, chat model and output parser, built once and
         reused for every reply.
+    :ivar condense_chain: The rewrite prompt, chat model and output parser,
+        built once and reused to turn follow-ups into standalone questions.
     """
 
     def __init__(
@@ -80,14 +89,18 @@ class ChatService:
         retriever: BaseRetriever | None = None,
         history_max_tokens: int = 2000,
         context_max_tokens: int = 3000,
+        rewrite_history_messages: int = 6,
     ):
         self.chat_model = chat_model
         self.history_max_tokens = history_max_tokens
         self.context_max_tokens = context_max_tokens
+        self.rewrite_history_messages = rewrite_history_messages
         self.callbacks = callbacks or []
         self.retriever = retriever
         # Declaring the chain here to avoid re-creating it for every reply, which would be inefficient.
         self.chain = HELPDESK_PROMPT | self.chat_model | StrOutputParser()
+        # Declaring the condense chain for query enhancement
+        self.condense_chain = CONDENSE_PROMPT | self.chat_model | StrOutputParser()
 
     def _run_config(
         self,
@@ -202,6 +215,65 @@ class ChatService:
         """
         return max(0, min(history_max, context_max - used))
 
+    async def _retrieval_query(
+        self,
+        message: str,
+        past: list[BaseMessage],
+        *,
+        user_id: str,
+        session_id: str,
+        request_id: str,
+    ) -> str:
+        """
+        Build the query sent to the retriever for this message.
+
+        A follow-up such as "and on Mac?" retrieves poorly on its own, so the
+        model rewrites it as a standalone question from the newest
+        ``rewrite_history_messages`` of the history. With no history, or with
+        the rewrite turned off, the message is used as it is and no model call
+        is made.
+
+        :param message: The user's question.
+        :param past: All stored messages of the session, before trimming.
+        :param user_id: The unique identifier of the user making the request.
+        :param session_id: The unique identifier of the chat session.
+        :param request_id: The unique identifier of the chat request.
+        :return: The standalone question, stripped of surrounding whitespace,
+            or ``message`` unchanged when no rewrite is made or the model
+            returns an empty one.
+        """
+        if not past or self.rewrite_history_messages == 0:
+            return message
+
+        trimmed_past = trim_messages(
+            past,
+            max_tokens=self.rewrite_history_messages,
+            token_counter=len,
+            strategy="last",  # keep the newest messages
+            start_on="human",  # never start with an answer whose question was cut
+        )
+
+        rewritten = await self.condense_chain.ainvoke(
+            {
+                "history": trimmed_past,
+                "question": message,
+            },
+            config={
+                "callbacks": self.callbacks,
+                # Stable and verb-first, like "chat-response" in _run_config.
+                "run_name": "rewrite-question",
+                "metadata": {
+                    "langfuse_user_id": user_id,
+                    "langfuse_session_id": session_id,
+                    # The rewrite is its own trace; the tag lets it be filtered.
+                    "langfuse_tags": ["rewrite"],
+                    "request_id": request_id,
+                },
+            },
+        )
+        # An empty rewrite would search for "", so keep the original message.
+        return rewritten.strip() or message
+
     async def reply(
         self,
         message: str,
@@ -238,8 +310,18 @@ class ChatService:
         :return: The answer and the sources it cites.
         """
 
+        past = await history.aget_messages()
+
         if self.retriever is not None:
-            docs = await self.retriever.ainvoke(message)
+            # The rewrite only serves retrieval, so skip it without a retriever.
+            query = await self._retrieval_query(
+                message,
+                past,
+                user_id=user_id,
+                session_id=session_id,
+                request_id=request_id,
+            )
+            docs = await self.retriever.ainvoke(query)
         else:
             docs = []
 
@@ -251,8 +333,6 @@ class ChatService:
         history_budget = self._history_budget(
             self.history_max_tokens, self.context_max_tokens, used
         )
-
-        past = await history.aget_messages()
 
         kept = trim_messages(
             past,

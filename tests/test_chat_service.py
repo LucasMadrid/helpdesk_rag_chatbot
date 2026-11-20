@@ -12,6 +12,7 @@ from pydantic import Field
 
 from helpdesk_rag_chatbot.services.chat import ChatService, ImageAttachment
 from helpdesk_rag_chatbot.services.prompts import (
+    CONDENSE_PROMPT,
     HELPDESK_PROMPT,
     NO_SOURCES,
     SYSTEM_PROMPT,
@@ -82,6 +83,12 @@ def test_prompt_needs_only_context_history_and_question():
     # A stray {placeholder} in the prompt text would become a required input
     # and make every reply fail with a missing-variable error.
     assert set(HELPDESK_PROMPT.input_variables) == {"context", "history", "question"}
+
+
+def test_condense_prompt_needs_only_history_and_question():
+    # Same guard as above: a stray {placeholder} in CONDENSE_SYSTEM_PROMPT would
+    # make every rewrite fail with a missing-variable error.
+    assert set(CONDENSE_PROMPT.input_variables) == {"history", "question"}
 
 
 def test_prompt_tells_the_model_how_to_cite():
@@ -336,6 +343,7 @@ def test_reply_gives_history_only_the_budget_left_after_chunks():
         retriever=FakeRetriever(docs=[PORTAL_DOC]),
         history_max_tokens=2000,
         context_max_tokens=used + 1,
+        rewrite_history_messages=0,  # only the answer prompt is under test
     )
 
     asyncio.run(service.reply("q2", history=history, **IDS))
@@ -374,7 +382,11 @@ def test_reply_does_not_save_when_the_model_fails():
 def test_second_reply_sends_first_turn_to_the_model():
     spy = PromptSpy()
     history = InMemoryChatMessageHistory()
-    service = ChatService(FakeListChatModel(responses=["a1", "a2"]), callbacks=[spy])
+    service = ChatService(
+        FakeListChatModel(responses=["a1", "a2"]),
+        callbacks=[spy],
+        rewrite_history_messages=0,  # only the answer prompt is under test
+    )
 
     asyncio.run(service.reply("q1", history=history, **IDS))
     asyncio.run(service.reply("q2", history=history, **IDS))
@@ -393,7 +405,10 @@ def test_reply_sends_only_the_newest_turns_that_fit():
     # Each stored message counts as 5 or 6 tokens (approximate counter), so a
     # budget of 25 has room for the two newest turns (22) but not a third (33).
     service = ChatService(
-        FakeListChatModel(responses=["a6"]), history_max_tokens=25, callbacks=[spy]
+        FakeListChatModel(responses=["a6"]),
+        history_max_tokens=25,
+        callbacks=[spy],
+        rewrite_history_messages=0,  # only the answer prompt is under test
     )
 
     asyncio.run(service.reply("q6", history=history, **IDS))
@@ -413,7 +428,10 @@ def test_reply_never_starts_the_history_with_an_answer():
     # A budget of 17 fits a4, q5 and a5, but a4's question was cut, so
     # start_on="human" drops a4 as well.
     service = ChatService(
-        FakeListChatModel(responses=["a6"]), history_max_tokens=17, callbacks=[spy]
+        FakeListChatModel(responses=["a6"]),
+        history_max_tokens=17,
+        callbacks=[spy],
+        rewrite_history_messages=0,  # only the answer prompt is under test
     )
 
     asyncio.run(service.reply("q6", history=history, **IDS))
@@ -430,7 +448,10 @@ def test_reply_still_sends_the_question_when_no_turn_fits():
     # A budget of 1 token is smaller than any single stored message, so the
     # whole history is dropped from the prompt.
     service = ChatService(
-        FakeListChatModel(responses=["a2"]), history_max_tokens=1, callbacks=[spy]
+        FakeListChatModel(responses=["a2"]),
+        history_max_tokens=1,
+        callbacks=[spy],
+        rewrite_history_messages=0,  # only the answer prompt is under test
     )
 
     reply = asyncio.run(service.reply("q2", history=history, **IDS))
@@ -486,3 +507,106 @@ def test_reply_saves_a_marker_instead_of_the_image():
 )
 def test_history_budget(history_max, context_max, used, expected):
     assert ChatService._history_budget(history_max, context_max, used) == expected
+
+
+def _history_with_turns(n: int) -> InMemoryChatMessageHistory:
+    """Return a history holding ``n`` stored turns: q1, a1 ... qn, an."""
+    history = InMemoryChatMessageHistory()
+    for i in range(1, n + 1):
+        history.add_user_message(f"q{i}")
+        history.add_ai_message(f"a{i}")
+    return history
+
+
+def test_retrieval_uses_the_message_when_there_is_no_history():
+    spy = PromptSpy()
+    retriever = FakeRetriever(docs=[])
+    service = ChatService(
+        FakeListChatModel(responses=["a1"]), callbacks=[spy], retriever=retriever
+    )
+
+    asyncio.run(service.reply("q1", history=InMemoryChatMessageHistory(), **IDS))
+
+    # Nothing to resolve, so only the answer call reaches the model.
+    assert len(spy.prompts) == 1
+    assert retriever.queries == ["q1"]
+
+
+def test_retrieval_uses_the_message_when_the_rewrite_is_off():
+    spy = PromptSpy()
+    retriever = FakeRetriever(docs=[])
+    service = ChatService(
+        FakeListChatModel(responses=["a2"]),
+        callbacks=[spy],
+        retriever=retriever,
+        rewrite_history_messages=0,
+    )
+
+    asyncio.run(service.reply("and on Mac?", history=_history_with_turns(1), **IDS))
+
+    assert len(spy.prompts) == 1
+    assert retriever.queries == ["and on Mac?"]
+
+
+def test_retrieval_uses_the_rewritten_question():
+    retriever = FakeRetriever(docs=[])
+    service = ChatService(
+        # The first response is the rewrite, the second the answer.
+        FakeListChatModel(responses=["  How do I set up the VPN on Mac?\n", "a2"]),
+        retriever=retriever,
+    )
+
+    reply = asyncio.run(
+        service.reply("and on Mac?", history=_history_with_turns(1), **IDS)
+    )
+
+    assert retriever.queries == ["How do I set up the VPN on Mac?"]
+    assert reply.answer == "a2"
+
+
+def test_retrieval_falls_back_to_the_message_on_an_empty_rewrite():
+    retriever = FakeRetriever(docs=[])
+    service = ChatService(
+        FakeListChatModel(responses=["  \n", "a2"]), retriever=retriever
+    )
+
+    asyncio.run(service.reply("and on Mac?", history=_history_with_turns(1), **IDS))
+
+    # Searching for "" would return noise, so the original message is used.
+    assert retriever.queries == ["and on Mac?"]
+
+
+def test_rewrite_sees_only_the_newest_messages():
+    spy = PromptSpy()
+    service = ChatService(
+        FakeListChatModel(responses=["rewritten", "a4"]),
+        callbacks=[spy],
+        retriever=FakeRetriever(docs=[]),
+        rewrite_history_messages=3,
+    )
+
+    asyncio.run(service.reply("q4", history=_history_with_turns(3), **IDS))
+
+    # The newest 3 are a2, q3, a3; a2's question was cut, so start_on="human"
+    # drops it. [1:] skips the system message.
+    assert [m.content for m in spy.prompts[0][1:]] == ["q3", "a3", "q4"]
+
+
+def test_rewrite_sends_run_name_and_ids_to_callbacks():
+    handler = RecordingHandler()
+    service = ChatService(
+        FakeListChatModel(responses=["rewritten", "a2"]),
+        callbacks=[handler],
+        retriever=FakeRetriever(docs=[]),
+    )
+
+    asyncio.run(service.reply("and on Mac?", history=_history_with_turns(1), **IDS))
+
+    assert "rewrite-question" in handler.names
+    assert any(
+        m.get("langfuse_tags") == ["rewrite"]
+        and m.get("langfuse_user_id") == "u-1"
+        and m.get("langfuse_session_id") == "s-1"
+        and m.get("request_id") == "r-1"
+        for m in handler.metadata
+    )
