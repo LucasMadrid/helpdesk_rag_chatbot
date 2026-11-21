@@ -10,7 +10,10 @@ import pytest
 from langfuse.langchain import CallbackHandler
 
 from helpdesk_rag_chatbot.adapters import tracing
-from helpdesk_rag_chatbot.adapters.tracing import get_langfuse_handler
+from helpdesk_rag_chatbot.adapters.tracing import (
+    get_langfuse_client,
+    get_langfuse_handler,
+)
 from helpdesk_rag_chatbot.config import Settings
 
 SettingsFactory = Callable[..., Settings]
@@ -81,3 +84,16 @@ def test_shutdown_does_nothing_when_disabled(
     tracing.shutdown_tracing(make_settings())
 
     client.shutdown.assert_not_called()
+
+
+def test_client_is_built_even_when_tracing_is_off(
+    monkeypatch: pytest.MonkeyPatch, make_settings: SettingsFactory
+) -> None:
+    # The dataset upload is an explicit command, so LANGFUSE_ENABLED must not stop it.
+    client_class = MagicMock()
+    monkeypatch.setattr(tracing, "Langfuse", client_class)
+
+    client = get_langfuse_client(make_settings(LANGFUSE_ENABLED=False))
+
+    assert client is client_class.return_value
+    assert client_class.call_args.kwargs["base_url"] == "http://localhost:3000"
