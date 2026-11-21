@@ -1,6 +1,6 @@
 from collections import Counter
 from pathlib import Path
-from typing import Literal, Self
+from typing import Any, Literal, Self
 
 import yaml
 from pydantic import BaseModel, Field, model_validator
@@ -88,3 +88,33 @@ def load_questions(path: Path) -> list[EvalQuestion]:
         raise ValueError(f"Duplicate question ids: {sorted(dupes)}")
 
     return eval_questions
+
+
+ITEM_ID_PREFIX = "helpdesk-qa-"
+
+
+def to_dataset_item(question: EvalQuestion) -> dict[str, Any]:
+    """Turn an eval question into the fields of a Langfuse dataset item.
+
+    The item id is stable (``Q06`` -> ``helpdesk-qa-q06``), so re-uploading the
+    YAML updates each item in place instead of adding a copy.
+
+    :param question: A validated question from ``load_questions``.
+    :returns: A dict with ``id``, ``input`` (what the bot is sent),
+        ``expected_output`` (what it is judged against) and ``metadata``
+        (for filtering results by question, type and split).
+    """
+    return {
+        "id": f"{ITEM_ID_PREFIX}{question.id.lower()}",
+        "input": {"question": question.question},
+        "expected_output": {
+            "answer": question.answer,
+            "sources": [source.model_dump() for source in question.sources],
+            "should_abstain": question.should_abstain,
+        },
+        "metadata": {
+            "question_id": question.id,
+            "type": question.type,
+            "split": question.split,
+        },
+    }

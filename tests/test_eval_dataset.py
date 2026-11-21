@@ -13,6 +13,7 @@ from helpdesk_rag_chatbot.evals.dataset import (
     ExpectedSource,
     QuestionType,
     load_questions,
+    to_dataset_item,
 )
 from helpdesk_rag_chatbot.ingestion.loaders import load_corpus
 
@@ -154,3 +155,32 @@ def test_holdout_covers_every_type_and_repeats_no_tune_question() -> None:
 
 def _normalise(text: str) -> str:
     return " ".join(text.lower().split())
+
+
+def test_to_dataset_item_has_the_langfuse_shape() -> None:
+    q06 = next(q for q in load_questions(QUESTIONS_FILE) if q.id == "Q06")
+
+    assert to_dataset_item(q06) == {
+        "id": "helpdesk-qa-q06",
+        "input": {"question": "How many days a year can I work from another country?"},
+        "expected_output": {
+            "answer": q06.answer,
+            "sources": [
+                {
+                    "doc_id": "hr-remote-work-policy",
+                    "version": "2.0",
+                    "section": "Limits and approval",
+                }
+            ],
+            "should_abstain": False,
+        },
+        "metadata": {"question_id": "Q06", "type": "version", "split": "tune"},
+    }
+
+
+def test_to_dataset_item_marks_unanswerable_as_abstain() -> None:
+    q11 = next(q for q in load_questions(QUESTIONS_FILE) if q.id == "Q11")
+    item = to_dataset_item(q11)
+
+    assert item["expected_output"]["sources"] == []
+    assert item["expected_output"]["should_abstain"] is True
