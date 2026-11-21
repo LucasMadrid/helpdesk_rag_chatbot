@@ -313,3 +313,31 @@ lists only the documents the answer cites, once each, with `doc_id`, `title`,
 documents don't cover, or an off-topic one, gets `"sources": []`. A message the
 provider's content filter blocks gets a short refusal instead of an error (see
 [ADR 0010](docs/adr/0010-rag-context-and-citations.md)).
+
+## Evals
+
+### Eval dataset
+
+`evals/questions.yaml` holds the 40 eval questions: the question, a reference
+answer, and the sources a correct answer cites (`doc_id`, `version`,
+`section`; `[]` when the docs don't cover it and the bot should abstain). It is
+the source of truth: edit the YAML, never the items in the Langfuse UI.
+`tests/test_eval_dataset.py` checks it against the corpus, so a source that
+names a superseded version or a section that doesn't exist fails the tests.
+
+Upload it to Langfuse (needs the `LANGFUSE_*` keys, even with
+`LANGFUSE_ENABLED=false`):
+
+```bash
+uv run python -m helpdesk_rag_chatbot.evals.upload
+# {"logger": "__main__", ..., "message": "eval dataset uploaded", "tune": 25, "holdout": 15}
+```
+
+| Dataset | Items | Use |
+|---|---|---|
+| `helpdesk-qa-tune` | 25 | run as often as needed while developing |
+| `helpdesk-qa-holdout` | 15 | run once, at the end of a phase; never tune against it |
+
+Running it again is safe: item ids are stable (`Q06` → `helpdesk-qa-q06`), so
+Langfuse updates items instead of adding copies. A question deleted from the
+YAML stays in Langfuse; archive it in the UI.
