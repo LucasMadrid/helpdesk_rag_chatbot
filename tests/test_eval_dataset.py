@@ -6,14 +6,17 @@ from typing import Any, get_args
 
 import pytest
 import yaml
+from fakes import FakeLangfuse
 from pydantic import ValidationError
 
 from helpdesk_rag_chatbot.evals.dataset import (
+    DATASET_NAMES,
     EvalQuestion,
     ExpectedSource,
     QuestionType,
     load_questions,
     to_dataset_item,
+    upload_questions,
 )
 from helpdesk_rag_chatbot.ingestion.loaders import load_corpus
 
@@ -105,15 +108,23 @@ def _lines(text: str) -> set[str]:
 
 # 6
 def test_every_source_names_a_doc_version_in_the_corpus() -> None:
-    corpus = _corpus()
+    corpus = {doc.id: doc for doc in load_corpus(DOCS_DIR)}
     missing = [
         f"{q.id}: {s.doc_id}@{s.version}"
         for q in load_questions(QUESTIONS_FILE)
         for s in q.sources
         if f"{s.doc_id}@{s.version}" not in corpus
     ]
+    superseded = [
+        f"{q.id}: {s.doc_id}@{s.version}"
+        for q in load_questions(QUESTIONS_FILE)
+        for s in q.sources
+        if f"{s.doc_id}@{s.version}" in corpus
+        and corpus[f"{s.doc_id}@{s.version}"].metadata["status"] != "current"
+    ]
 
     assert not missing, f"not in data/docs: {missing}"
+    assert not superseded, f"not the current document: {superseded}"
 
 
 # 7
@@ -148,15 +159,19 @@ def test_holdout_covers_every_type_and_repeats_no_tune_question() -> None:
     questions = load_questions(QUESTIONS_FILE)
     holdout = [q for q in questions if q.split == "holdout"]
     tune_texts = {_normalise(q.question) for q in questions if q.split == "tune"}
+    unanswerable = [q for q in questions if q.type == "unanswerable"]
 
     assert {q.type for q in holdout} == set(get_args(QuestionType))
     assert not [q.id for q in holdout if _normalise(q.question) in tune_texts]
+    assert len(unanswerable) >= 5
+    assert len([q for q in unanswerable if q.split == "holdout"]) >= 2
 
 
 def _normalise(text: str) -> str:
     return " ".join(text.lower().split())
 
 
+# 10
 def test_to_dataset_item_has_the_langfuse_shape() -> None:
     q06 = next(q for q in load_questions(QUESTIONS_FILE) if q.id == "Q06")
 
@@ -184,3 +199,35 @@ def test_to_dataset_item_marks_unanswerable_as_abstain() -> None:
 
     assert item["expected_output"]["sources"] == []
     assert item["expected_output"]["should_abstain"] is True
+
+
+# 11
+def test_upload_puts_each_question_in_its_split_dataset() -> None:
+    questions = load_questions(QUESTIONS_FILE)
+    client = FakeLangfuse()
+
+    counts = upload_questions(client, questions)
+
+    assert counts == {"tune": 25, "holdout": 15}
+    assert set(client.datasets) == set(DATASET_NAMES.values())
+    for q in questions:
+        item = client.items[DATASET_NAMES[q.split]][f"helpdesk-qa-{q.id.lower()}"]
+        assert item["input"] == {"question": q.question}
+
+
+# 12
+def test_upload_twice_updates_items_instead_of_copying_them() -> None:
+    questions = load_questions(QUESTIONS_FILE)
+    client = FakeLangfuse()
+    upload_questions(client, questions)
+
+    edited = [
+        q.model_copy(update={"answer": "Edited."}) if q.id == "Q06" else q
+        for q in questions
+    ]
+    upload_questions(client, edited)
+
+    tune = client.items[DATASET_NAMES["tune"]]
+    assert len(tune) == 25
+    assert len(client.items[DATASET_NAMES["holdout"]]) == 15
+    assert tune["helpdesk-qa-q06"]["expected_output"]["answer"] == "Edited."
