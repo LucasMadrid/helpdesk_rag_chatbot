@@ -211,8 +211,8 @@ current one. Some topics (parking, the canteen) are left out on purpose to test
 
 To add a document, follow the same naming and metadata, then run
 `uv run pytest tests/test_corpus.py`: it checks the metadata, the file names
-and that each `doc_id` has exactly one current version. Starter eval questions
-are in `evals/seed_questions.md`.
+and that each `doc_id` has exactly one current version. The eval questions are
+in `evals/questions.yaml`.
 
 ### Loading the corpus
 
@@ -292,7 +292,11 @@ returns chunks whose `status` is `current` (`CURRENT_ONLY_FILTER`), so a
 superseded version never reaches the answer. Chunks whose relevance score is
 below `RETRIEVAL_MIN_SCORE` are dropped too, so an off-topic question can get
 no chunks at all; the model then sees `(none)` as its sources and says the
-documents don't cover it.
+documents don't cover it (see
+[ADR 0011](docs/adr/0011-relevance-threshold.md)). A follow-up question like
+"and in Lisbon?" is first rewritten into a standalone question from the recent
+history, so the retriever searches for what the user means (see
+[ADR 0012](docs/adr/0012-rewrite-follow-up-questions.md)).
 
 | Setting | Default | Meaning |
 |---|---|---|
@@ -309,3 +313,31 @@ lists only the documents the answer cites, once each, with `doc_id`, `title`,
 documents don't cover, or an off-topic one, gets `"sources": []`. A message the
 provider's content filter blocks gets a short refusal instead of an error (see
 [ADR 0010](docs/adr/0010-rag-context-and-citations.md)).
+
+## Evals
+
+### Eval dataset
+
+`evals/questions.yaml` holds the 40 eval questions: the question, a reference
+answer, and the sources a correct answer cites (`doc_id`, `version`,
+`section`; `[]` when the docs don't cover it and the bot should abstain). It is
+the source of truth: edit the YAML, never the items in the Langfuse UI.
+`tests/test_eval_dataset.py` checks it against the corpus, so a source that
+names a superseded version or a section that doesn't exist fails the tests.
+
+Upload it to Langfuse (needs the `LANGFUSE_*` keys, even with
+`LANGFUSE_ENABLED=false`):
+
+```bash
+uv run python -m helpdesk_rag_chatbot.evals.upload
+# {"logger": "__main__", ..., "message": "eval dataset uploaded", "tune": 25, "holdout": 15}
+```
+
+| Dataset | Items | Use |
+|---|---|---|
+| `helpdesk-qa-tune` | 25 | run as often as needed while developing |
+| `helpdesk-qa-holdout` | 15 | run once, at the end of a phase; never tune against it |
+
+Running it again is safe: item ids are stable (`Q06` → `helpdesk-qa-q06`), so
+Langfuse updates items instead of adding copies. A question deleted from the
+YAML stays in Langfuse; archive it in the UI.

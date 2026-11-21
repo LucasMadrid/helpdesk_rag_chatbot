@@ -130,3 +130,24 @@ class ScoredInMemoryVectorStore(InMemoryVectorStore):
 
     def _select_relevance_score_fn(self) -> Callable[[float], float]:
         return lambda similarity: (similarity + 1) / 2
+
+
+class FakeLangfuse:
+    """Stands in for the Langfuse client's dataset methods, with no network.
+
+    Like the real API, it upserts: datasets by name and items by id, so a
+    second upload replaces items instead of adding copies.
+    """
+
+    def __init__(self) -> None:
+        self.datasets: dict[str, dict[str, Any]] = {}
+        self.items: dict[str, dict[str, dict[str, Any]]] = {}
+
+    def create_dataset(self, *, name: str, **fields: Any) -> None:
+        self.datasets[name] = fields
+        self.items.setdefault(name, {})
+
+    def create_dataset_item(self, *, dataset_name: str, id: str, **fields: Any) -> None:
+        if dataset_name not in self.datasets:
+            raise LookupError(f"dataset {dataset_name!r} was never created")
+        self.items[dataset_name][id] = fields
