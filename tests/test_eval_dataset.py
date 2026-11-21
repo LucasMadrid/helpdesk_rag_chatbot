@@ -164,6 +164,10 @@ def test_holdout_covers_every_type_and_repeats_no_tune_question() -> None:
 
     assert {q.type for q in holdout} == set(get_args(QuestionType))
     assert not [q.id for q in holdout if _normalise(q.question) in tune_texts]
+    # Q01-Q20 are the seed questions, already seen while developing, so the
+    # holdout would no longer be unseen if any of them moved there.
+    seeds_in_holdout = [q.id for q in holdout if int(q.id[1:]) <= 20]
+    assert not seeds_in_holdout, f"seed questions in holdout: {seeds_in_holdout}"
     assert len(unanswerable) >= 5
     assert len([q for q in unanswerable if q.split == "holdout"]) >= 2
 
