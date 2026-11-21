@@ -1,3 +1,10 @@
+"""Eval questions: load them from YAML and upload them as Langfuse datasets.
+
+``evals/questions.yaml`` is the source of truth. ``load_questions`` validates
+it, ``to_dataset_item`` maps each question to a Langfuse dataset item, and
+``upload_questions`` writes the tune and holdout splits to their own datasets.
+"""
+
 from collections import Counter
 from pathlib import Path
 from typing import Any, Literal, Self

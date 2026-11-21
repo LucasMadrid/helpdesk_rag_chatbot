@@ -109,15 +109,16 @@ def _lines(text: str) -> set[str]:
 # 6
 def test_every_source_names_a_doc_version_in_the_corpus() -> None:
     corpus = {doc.id: doc for doc in load_corpus(DOCS_DIR)}
+    questions = load_questions(QUESTIONS_FILE)
     missing = [
         f"{q.id}: {s.doc_id}@{s.version}"
-        for q in load_questions(QUESTIONS_FILE)
+        for q in questions
         for s in q.sources
         if f"{s.doc_id}@{s.version}" not in corpus
     ]
     superseded = [
         f"{q.id}: {s.doc_id}@{s.version}"
-        for q in load_questions(QUESTIONS_FILE)
+        for q in questions
         for s in q.sources
         if f"{s.doc_id}@{s.version}" in corpus
         and corpus[f"{s.doc_id}@{s.version}"].metadata["status"] != "current"
